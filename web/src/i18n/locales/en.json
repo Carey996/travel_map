@@ -1,0 +1,59 @@
+{
+  "app": { "title": "Travel Map Blog", "subtitle": "Record your journeys on a map" },
+  "common": {
+    "loading": "Loading…", "save": "Save", "cancel": "Cancel", "delete": "Delete",
+    "edit": "Edit", "preview": "Preview", "close": "Close", "confirm": "Confirm"
+  },
+  "lang": { "label": "Language" },
+  "nav": { "map": "Map", "timeline": "Timeline" },
+  "auth": {
+    "login": "Sign in", "register": "Sign up", "email": "Email", "password": "Password",
+    "displayName": "Display name", "passwordHint": "At least 8 characters", "signIn": "Sign in",
+    "signUp": "Create account", "signOut": "Sign out",
+    "emailRequired": "Email is required", "emailInvalid": "Invalid email address", "passwordRequired": "Password is required"
+  },
+  "tabs": { "places": "Places", "timeline": "Timeline", "unplaced": "Unplaced" },
+  "map": {
+    "searchPlaceholder": "Search a city or place…", "newPlace": "＋ New place",
+    "clickToPlace": "Click the map", "placeModeHint": "Click a spot on the map to create a place",
+    "layers": "Base map", "dots": "Photo dots", "showPhotoDots": "Show individual photos when zoomed in",
+    "fitAll": "Fit all", "pickPointForPhotos": "Click the map where these photos were taken",
+    "emptyTitle": "No places yet", "emptyBody": "Upload photos with GPS and places appear automatically, or click the map to create one."
+  },
+  "upload": {
+    "add": "Upload photos", "dropHere": "Drop to upload", "uploading": "Uploading {done}/{total}",
+    "done": "Uploaded {n} photos", "skipped": "{n} already existed and were skipped",
+    "partialFail": "{n} failed: {message}", "notImage": "Only image files are supported",
+    "undecodable": "{n} files could not be decoded by the browser (possibly HEIC); uploaded but not previewable"
+  },
+  "place": {
+    "unnamed": "Unnamed place", "needName": "needs a name", "namePlaceholder": "Name this place",
+    "geocodeNow": "Auto-fill name", "kind": { "city": "City", "spot": "Spot", "region": "Region", "other": "Other" },
+    "rating": "Rating", "summary": "Summary", "summaryPlaceholder": "Write something… (Markdown supported)",
+    "summaryEmpty": "No summary yet", "addTag": "Add a tag and press Enter", "photos": "Photos",
+    "noPhotos": "No photos in this place yet", "notes": "Travel notes", "empty": "No places yet",
+    "photoCount": "{n} photos", "dangerZone": "Danger zone",
+    "mergeInto": "Merge into another place…", "deleteKeepPhotos": "Delete place (keep photos)",
+    "deleteWithPhotos": "Delete place and photos", "deleted": "Place deleted", "merged": "Merged",
+    "confirmDelete": "Delete “{name}”? Its photos are kept and simply become unassigned.",
+    "confirmDeleteWithPhotos": "Delete “{name}” and all of its photos? This cannot be undone."
+  },
+  "note": {
+    "new": "New note", "titlePlaceholder": "Title", "bodyPlaceholder": "What happened that day… (Markdown supported)",
+    "untitled": "Untitled", "empty": "No notes yet", "happenedOn": "Date"
+  },
+  "photo": {
+    "empty": "No photos yet", "noUnplaced": "All photos are located",
+    "unplacedHint": "These photos have no GPS data. Click the button below, then pick their location on the map.",
+    "placeOnMap": "Place on map", "takenAt": "Taken", "camera": "Camera",
+    "exposure": "Exposure", "location": "Location", "size": "Size", "locate": "Show on map",
+    "setLocation": "Set location", "original": "View original", "delete": "Delete photo",
+    "captionPlaceholder": "Add a caption…"
+  },
+  "health": {
+    "title": "System check", "desc": "Verify the frontend, backend and dependencies.", "checking": "Checking…",
+    "refresh": "Check again", "status": "Overall", "ok": "OK", "degraded": "Degraded",
+    "database": "Database (Postgres)", "redis": "Session store (Redis)", "storage": "Object storage (MinIO)",
+    "app": "App", "version": "Version", "environment": "Environment", "error": "Check failed"
+  }
+}

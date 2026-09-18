@@ -1,0 +1,59 @@
+{
+  "app": { "title": "旅行地图博客", "subtitle": "在地图上记录你的旅程" },
+  "common": {
+    "loading": "加载中…", "save": "保存", "cancel": "取消", "delete": "删除",
+    "edit": "编辑", "preview": "预览", "close": "关闭", "confirm": "确定"
+  },
+  "lang": { "label": "语言" },
+  "nav": { "map": "地图", "timeline": "时间线" },
+  "auth": {
+    "login": "登录", "register": "注册", "email": "邮箱", "password": "密码",
+    "displayName": "昵称", "passwordHint": "至少 8 位", "signIn": "登录",
+    "signUp": "创建账号", "signOut": "退出",
+    "emailRequired": "请输入邮箱", "emailInvalid": "邮箱格式不正确", "passwordRequired": "请输入密码"
+  },
+  "tabs": { "places": "地点", "timeline": "时间线", "unplaced": "未定位" },
+  "map": {
+    "searchPlaceholder": "搜索城市或地点…", "newPlace": "＋ 新建地点",
+    "clickToPlace": "点地图选位置", "placeModeHint": "点击地图上的位置来新建一个地点",
+    "layers": "底图", "dots": "照片点", "showPhotoDots": "在高缩放级别显示单张照片的位置",
+    "fitAll": "全览", "pickPointForPhotos": "请在地图上点击照片所在的位置",
+    "emptyTitle": "还没有任何地点", "emptyBody": "上传带 GPS 的照片会自动在地图上生成地点，也可以直接点地图新建。"
+  },
+  "upload": {
+    "add": "上传照片", "dropHere": "松手即上传", "uploading": "正在上传 {done}/{total}",
+    "done": "已上传 {n} 张照片", "skipped": "{n} 张已存在，已跳过上传",
+    "partialFail": "{n} 张上传失败：{message}", "notImage": "只能上传图片文件",
+    "undecodable": "{n} 张图片浏览器无法解码（可能是 HEIC），已上传但暂不能预览"
+  },
+  "place": {
+    "unnamed": "未命名地点", "needName": "待命名", "namePlaceholder": "给这个地点起个名字",
+    "geocodeNow": "自动补全地名", "kind": { "city": "城市", "spot": "地点", "region": "区域", "other": "其他" },
+    "rating": "评分", "summary": "笔记摘要", "summaryPlaceholder": "写点什么…（支持 Markdown）",
+    "summaryEmpty": "还没有摘要", "addTag": "添加标签后回车", "photos": "照片",
+    "noPhotos": "这个地点还没有照片", "notes": "旅行笔记", "empty": "还没有地点",
+    "photoCount": "{n} 张照片", "dangerZone": "危险操作",
+    "mergeInto": "合并到其他地点…", "deleteKeepPhotos": "删除地点（保留照片）",
+    "deleteWithPhotos": "删除地点及照片", "deleted": "地点已删除", "merged": "已合并",
+    "confirmDelete": "确定删除「{name}」吗？它下面的照片会保留，只是不再归属任何地点。",
+    "confirmDeleteWithPhotos": "确定删除「{name}」及其全部照片吗？此操作不可撤销。"
+  },
+  "note": {
+    "new": "新建笔记", "titlePlaceholder": "标题", "bodyPlaceholder": "写下这一天的经历…（支持 Markdown）",
+    "untitled": "无标题", "empty": "还没有笔记", "happenedOn": "日期"
+  },
+  "photo": {
+    "empty": "还没有照片", "noUnplaced": "所有照片都已定位",
+    "unplacedHint": "这些照片没有 GPS 信息。点击下方按钮，然后在地图上点选它们拍摄的位置。",
+    "placeOnMap": "放到地图上", "takenAt": "拍摄时间", "camera": "相机",
+    "exposure": "曝光", "location": "位置", "size": "大小", "locate": "在地图上查看",
+    "setLocation": "设置位置", "original": "查看原图", "delete": "删除照片",
+    "captionPlaceholder": "为这张照片写一句说明…"
+  },
+  "health": {
+    "title": "系统自检", "desc": "确认前后端与各依赖是否连通。", "checking": "正在检查…",
+    "refresh": "重新检查", "status": "总体状态", "ok": "正常", "degraded": "异常",
+    "database": "数据库 (Postgres)", "redis": "会话存储 (Redis)", "storage": "对象存储 (MinIO)",
+    "app": "应用", "version": "版本", "environment": "运行环境", "error": "检查失败"
+  }
+}
