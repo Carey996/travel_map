@@ -11,9 +11,12 @@ export default defineConfig({
     },
   },
   server: {
+    // 明确绑 IPv4：Windows 上 localhost 常被优先解析成 ::1，只写端口会让
+    // http://127.0.0.1:5173 连不上，而 README 与 CORS 白名单用的都是它。
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    // 开发期把 /api 与探针路径代理到 FastAPI，让浏览器视角下前后端同源：
+    // 开发期把 /api 与探针路径代理到后端，让浏览器视角下前后端同源：
     // 会话 Cookie 因此天然可用，无需处理跨站 Cookie 的诸多限制。
     proxy: {
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false },
