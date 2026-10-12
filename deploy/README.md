@@ -35,6 +35,9 @@ podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/trave
 podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
 
 # 2A. 本地跑（不需要集群）
+#     ⚠️ 先停掉「快速开始」那套开发容器：Pod 里的 minio 也要绑 9000
+podman rm -f travelblog-postgres travelblog-redis travelblog-minio
+podman play kube --down    deploy/k8s/local/pod.yaml     # 起失败过时先清干净
 podman play kube --replace deploy/k8s/local/pod.yaml
 #     -> 打开 http://127.0.0.1:8080
 

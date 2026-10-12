@@ -270,8 +270,12 @@ podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/trave
 podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
 
 # 2A. 本地验证：不需要集群，podman play kube 直接跑起同一个 Pod
-podman play kube --replace deploy/k8s/local/pod.yaml     # -> http://127.0.0.1:8080
+#     ⚠️ Pod 里的 minio 也要绑 9000，先停掉「快速开始」那套开发容器，
+#        否则报 listen tcp4 :9000: bind: address already in use
+podman rm -f travelblog-postgres travelblog-redis travelblog-minio
+#     起失败过就先清干净，不然会留下一组 Created 状态的容器
 podman play kube --down    deploy/k8s/local/pod.yaml
+podman play kube --replace deploy/k8s/local/pod.yaml     # -> http://127.0.0.1:8080
 
 # 2B. 生产：kustomize 应用到集群（先跑迁移 Job，再应用其余资源）
 kubectl apply -f deploy/k8s/base/migrate-job.yaml

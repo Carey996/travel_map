@@ -47,6 +47,13 @@ Pod 会因为端口冲突而起不来（报 `address already in use`）。先把
 podman rm -f travelblog-postgres travelblog-redis travelblog-minio
 ```
 
+如果上一次已经起失败过，先清干净再重来——失败会留下一组 `Created` 状态的容器，
+直接重跑 `--replace` 容易继续撞在同一个地方：
+
+```bash
+podman play kube --down deploy/k8s/local/pod.yaml
+```
+
 ## 这份清单刻意省略的东西
 
 安全上下文、资源限额、PDB、Service、Ingress——这些在 `base/` 里有，
