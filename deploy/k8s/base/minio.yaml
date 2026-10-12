@@ -1,0 +1,94 @@
+# 开发/自托管用的 MinIO。
+#
+# 生产应当换成托管对象存储（S3 / R2），把 S3_ENDPOINT_URL 与 S3_PUBLIC_ENDPOINT_URL
+# 指过去即可——后端只用 S3 协议，没有任何 MinIO 特有调用。
+apiVersion: v1
+kind: Service
+metadata:
+  name: travel-blog-minio
+  namespace: travel-blog
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: travel-blog
+    app.kubernetes.io/component: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: travel-blog-minio
+  namespace: travel-blog
+spec:
+  serviceName: travel-blog-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: travel-blog
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: travel-blog
+        app.kubernetes.io/component: minio
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: travel-blog-secrets
+                  key: S3_ACCESS_KEY
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: travel-blog-secrets
+                  key: S3_SECRET_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi

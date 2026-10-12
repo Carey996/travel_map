@@ -1,0 +1,24 @@
+# 用 kustomize 组装基础层：
+#   kubectl apply -k deploy/k8s/base
+#
+# 注意：Secret 用的是示例文件，真实部署请先按 secret.example.yaml 的说明创建 Secret，
+# 或把 secret.example.yaml 换成你自己的 SealedSecret / ExternalSecret。
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: travel-blog
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.example.yaml
+  - postgres.yaml
+  - redis.yaml
+  - minio.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - web.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: travel-blog

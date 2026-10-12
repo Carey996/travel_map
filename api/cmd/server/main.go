@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log/slog"
 	"net/http"
 	"os"
@@ -35,6 +36,11 @@ func main() {
 }
 
 func run() error {
+	// -migrate-only：只跑结构迁移后退出，供 Kubernetes 的迁移 Job 使用。
+	// 这样 API 的多副本可以完全不做 DDL，避免并发迁移。
+	migrateOnly := flag.Bool("migrate-only", false, "只执行数据库结构迁移后退出")
+	flag.Parse()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -48,8 +54,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := db.Migrate(gdb); err != nil {
-		return err
+	if *migrateOnly {
+		if err := db.Migrate(gdb); err != nil {
+			return err
+		}
+		slog.Info("结构迁移完成，按 -migrate-only 退出")
+		return nil
+	}
+	if cfg.MigrateOnStart {
+		if err := db.Migrate(gdb); err != nil {
+			return err
+		}
+	} else {
+		slog.Info("已跳过启动时迁移（MIGRATE_ON_START=false）")
 	}
 
 	// ---- Redis ----

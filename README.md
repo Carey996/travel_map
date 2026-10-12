@@ -30,6 +30,12 @@ README.md                              项目总览（本文件）
 │       ├── service/README.md          照片自动聚类
 │       ├── middleware/README.md       CORS 与 CSRF
 │       └── handler/README.md          路由与各资源处理器
+├── deploy/README.md                   部署与容器化（K8s 清单 / 镜像 / nginx）
+│   ├── containerfiles/README.md       后端与前端的镜像定义
+│   ├── nginx/README.md                SPA 路由与 /api 反代策略
+│   └── k8s/README.md                  清单总览：生产向与验证向
+│       ├── base/README.md             生产清单逐个文件说明
+│       └── local/README.md            单 Pod 验证清单
 └── web/README.md                      前端总览
     └── src/README.md                  前端源码分层与依赖方向
         ├── components/README.md       7 个视图组件的职责与硬约束
@@ -48,6 +54,7 @@ README.md                              项目总览（本文件）
 | **本文件** | 项目总览、架构、快速开始、关键设计决策、底图选型实测数据 |
 | [`api/README.md`](api/README.md) | 后端：知识树导航、分层与依赖方向、请求生命周期、数据模型、无状态约束 |
 | [`web/README.md`](web/README.md) | 前端：组件索引、状态流、坐标与 i18n 约定、上传管线、构建产物 |
+| [`deploy/README.md`](deploy/README.md) | 部署：容器镜像、K8s 清单（生产 + 本地验证）、nginx 同源反代 |
 
 ---
 ## 功能
@@ -99,7 +106,37 @@ README.md                              项目总览（本文件）
 
 ---
 
-## 快速开始
+## 用 Kubernetes 部署
+
+两套编排，**同一份镜像**：
+
+```powershell
+# 构建镜像（后端交叉编译 + 前端容器内构建）
+powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1
+
+# 本地验证：不需要集群，podman play kube 直接跑起同一个 Pod
+powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local   # -> http://127.0.0.1:8080
+
+# 生产：kustomize 应用到集群
+kubectl apply -f deploy/k8s/base/migrate-job.yaml
+kubectl -n travel-blog wait --for=condition=complete job/travel-blog-migrate --timeout=180s
+kubectl apply -k deploy/k8s/base
+```
+
+三个和后端无状态直接相关的地方：
+
+- **API 是 2 副本的**，迁移因此收敛到独立 Job（`MIGRATE_ON_START=false`）；
+  代码里还加了 Postgres 咨询锁，重跑或多副本并发也不会出错
+- **`readOnlyRootFilesystem: true`** —— 服务不写任何文件，根文件系统可以完全只读
+- **存活探针不碰依赖**（`/healthz`），就绪探针才检查（`/healthz/ready`）；
+  数据库挂了不该重启进程，而应摘掉流量
+
+细节见 [`deploy/README.md`](deploy/README.md)。
+
+---
+
+## 快速开始（本地开发）
+
 
 ### 前置条件
 

@@ -1,0 +1,133 @@
+# 本地一体化 Pod —— 用 podman 直接跑起来，不需要 K8s 集群。
+#
+#   podman play kube deploy/k8s/local/pod.yaml
+#   podman play kube --down deploy/k8s/local/pod.yaml
+#
+# 存在的意义：**验证 K8s 清单里用到的镜像与配置真的能跑**。
+# Pod 内的容器共享网络命名空间，因此彼此用 127.0.0.1 通信，
+# 与集群里用 Service DNS 的区别只体现在地址上。
+#
+# 与 base/ 的差异（刻意的）：
+#   - 五个容器合成一个 Pod，用 emptyDir 而非 PVC（本地验证不需要持久化）
+#   - 不设安全上下文（Podman 下以 root 跑更省事）；集群清单里则是全套加固
+apiVersion: v1
+kind: Pod
+metadata:
+  name: travel-blog-local
+  labels:
+    app.kubernetes.io/name: travel-blog
+spec:
+  restartPolicy: Always
+  containers:
+    - name: postgres
+      image: docker.io/library/postgres:16-alpine
+      env:
+        - name: POSTGRES_USER
+          value: travelblog
+        - name: POSTGRES_PASSWORD
+          value: travelblog
+        - name: POSTGRES_DB
+          value: travelblog
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+      volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+      readinessProbe:
+        exec:
+          command: ["pg_isready", "-U", "travelblog", "-d", "travelblog"]
+        initialDelaySeconds: 5
+        periodSeconds: 5
+
+    - name: redis
+      image: docker.io/library/redis:7-alpine
+      args: ["redis-server", "--save", "", "--appendonly", "no"]
+      readinessProbe:
+        exec:
+          command: ["redis-cli", "ping"]
+        initialDelaySeconds: 3
+        periodSeconds: 5
+
+    - name: minio
+      image: quay.io/minio/minio:latest
+      args: ["server", "/data", "--console-address", ":9001"]
+      env:
+        - name: MINIO_ROOT_USER
+          value: minioadmin
+        - name: MINIO_ROOT_PASSWORD
+          value: minioadmin
+      ports:
+        # hostPort 让宿主机能直接访问：预签名 URL 里的地址必须是浏览器可达的
+        - containerPort: 9000
+          hostPort: 9000
+      volumeMounts:
+        - name: miniodata
+          mountPath: /data
+      readinessProbe:
+        httpGet:
+          path: /minio/health/live
+          port: 9000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+
+    - name: api
+      image: localhost/travel-blog-api:dev
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 8000
+      env:
+        - name: ENVIRONMENT
+          value: dev
+        - name: DATABASE_URL
+          value: postgres://travelblog:travelblog@127.0.0.1:5432/travelblog?sslmode=disable
+        - name: REDIS_URL
+          value: redis://127.0.0.1:6379/0
+        - name: SESSION_BACKEND
+          value: redis
+        - name: S3_ENDPOINT_URL
+          value: http://127.0.0.1:9000
+        # 浏览器直传用的地址；本地就是宿主机上的 MinIO
+        - name: S3_PUBLIC_ENDPOINT_URL
+          value: http://127.0.0.1:9000
+        - name: S3_ACCESS_KEY
+          value: minioadmin
+        - name: S3_SECRET_KEY
+          value: minioadmin
+        - name: S3_BUCKET
+          value: travelblog
+        - name: CORS_ORIGINS
+          value: http://127.0.0.1:8080
+        - name: COOKIE_SECURE
+          value: "false"
+        - name: GEOCODE_PROVIDER
+          value: photon
+      readinessProbe:
+        httpGet:
+          path: /healthz/ready
+          port: 8000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 12
+
+    - name: web
+      image: localhost/travel-blog-web:dev
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 8080
+          hostPort: 8080
+      env:
+        # 同 Pod 内容器共享网络，直接走 127.0.0.1
+        - name: API_UPSTREAM
+          value: 127.0.0.1:8000
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 8080
+        initialDelaySeconds: 3
+        periodSeconds: 5
+
+  volumes:
+    - name: pgdata
+      emptyDir: {}
+    - name: miniodata
+      emptyDir: {}

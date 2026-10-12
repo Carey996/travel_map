@@ -1,0 +1,57 @@
+# 前端容器的 nginx 配置（模板）。
+#
+# 官方 nginx 镜像会自动对 /etc/nginx/templates/*.template 做 envsubst 后写到
+# /etc/nginx/conf.d/ 下，因此上游地址可以用环境变量注入：
+#   Kubernetes：API_UPSTREAM=travel-blog-api:8000（Service DNS）
+#   本地 podman play kube：API_UPSTREAM=127.0.0.1:8000（同 Pod 内共享网络）
+#
+# 关键点：**把 /api 与 /healthz 反代到后端**，让浏览器视角下前后端同源。
+# 收益有两个：会话 Cookie 的 SameSite=Lax 正常工作，不必放宽到 None；
+# 也不需要给前端配 CORS 白名单里的额外来源。
+upstream api_upstream {
+    server ${API_UPSTREAM};
+}
+
+server {
+    # 监听 8080 而非 80：这样容器可以完全以非 root 运行
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA 路由：找不到实体文件就交回 index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # 上传的是元数据而非文件本体，但预签名签发可能稍慢，给足超时
+        proxy_read_timeout 60s;
+    }
+
+    location /healthz {
+        proxy_pass http://api_upstream;
+        proxy_set_header Host $host;
+    }
+
+    # 静态资源长缓存；index.html 不缓存，保证发版即时生效
+    location ~* \.(?:js|css|woff2?|png|jpg|jpeg|svg|webp|ico)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+}

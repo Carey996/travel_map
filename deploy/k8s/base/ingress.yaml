@@ -1,0 +1,37 @@
+# 对外入口。
+#
+# 只暴露 web：前端 nginx 已经把 /api 与 /healthz 反代到后端，
+# 这样浏览器视角下前后端同源，会话 Cookie 的 SameSite=Lax 正常工作。
+#
+# MinIO 必须**单独暴露**：图片是浏览器拿着预签名 URL 直传/直取的，
+# 不经过我们的 API。S3_PUBLIC_ENDPOINT_URL 必须与下面这个域名一致。
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: travel-blog
+  namespace: travel-blog
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"   # 直传走 MinIO，这里不限
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: travel-blog.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: travel-blog-web
+                port:
+                  number: 8080
+    - host: minio.travel-blog.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: travel-blog-minio
+                port:
+                  number: 9000

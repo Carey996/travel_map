@@ -1,0 +1,88 @@
+# 开发/自托管用的 Postgres。
+#
+# 生产应当换成托管数据库（RDS / Cloud SQL / Neon），把 DATABASE_URL 指过去即可——
+# 后端不依赖任何本地状态，所以换库只是改一个环境变量。
+apiVersion: v1
+kind: Service
+metadata:
+  name: travel-blog-postgres
+  namespace: travel-blog
+spec:
+  clusterIP: None          # headless：StatefulSet 的稳定网络标识
+  selector:
+    app.kubernetes.io/name: travel-blog
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: travel-blog-postgres
+  namespace: travel-blog
+spec:
+  serviceName: travel-blog-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: travel-blog
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: travel-blog
+        app.kubernetes.io/component: postgres
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999          # postgres 镜像内置用户
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: travelblog
+            - name: POSTGRES_DB
+              value: travelblog
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: travel-blog-secrets
+                  key: DB_PASSWORD
+            # 数据目录放到子目录，避免挂载点根目录的 lost+found 干扰 initdb
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "travelblog", "-d", "travelblog"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "travelblog", "-d", "travelblog"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

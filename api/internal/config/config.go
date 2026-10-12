@@ -23,6 +23,9 @@ type Config struct {
 	APIPort     int
 
 	DatabaseURL string
+	// MigrateOnStart 控制进程启动时是否执行结构迁移。
+	// 多副本部署时应当置 false，改由独立的 Job 迁移——否则 N 个副本会并发跑 DDL。
+	MigrateOnStart bool
 
 	RedisURL       string
 	SessionBackend string // redis | db
@@ -84,7 +87,8 @@ func Load() (*Config, error) {
 		Environment: env("ENVIRONMENT", "dev"),
 		APIPort:     envInt("API_PORT", 8000),
 
-		DatabaseURL: env("DATABASE_URL", "postgres://travelblog:travelblog@localhost:5432/travelblog?sslmode=disable"),
+		DatabaseURL:    env("DATABASE_URL", "postgres://travelblog:travelblog@localhost:5432/travelblog?sslmode=disable"),
+		MigrateOnStart: envBool("MIGRATE_ON_START", true),
 
 		RedisURL:       env("REDIS_URL", "redis://localhost:6379/0"),
 		SessionBackend: env("SESSION_BACKEND", "redis"),

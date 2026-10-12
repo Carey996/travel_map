@@ -87,6 +87,11 @@ go env -w GOPROXY=https://goproxy.cn,direct
 go mod tidy
 go build -o bin/server.exe ./cmd/server
 
+# Kubernetes / 容器
+powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1        # 构建前后端镜像
+powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local   # podman play kube 本地跑（不需要集群）
+powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Down    # 停本地 Pod
+
 # 停止
 powershell -ExecutionPolicy Bypass -File scripts\stop-dev.ps1   # 只停前后端
 powershell -ExecutionPolicy Bypass -File scripts\dev-down.ps1   # 停依赖容器
@@ -132,4 +137,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-down.ps1   # 停依赖容�
 | 无头浏览器 CDP 起不来（`bind() 0x271D`） | 端口落在保留段，换端口 |
 | `github.com` 时通时不通 | `api.github.com` 与 `codeload.github.com` 稳定，`github.com` 间歇；大文件下载基本过不去 |
 | 用 `pwsh` 工具执行命令失败 | 该工具在本机不稳定；改用 Node 的 `child_process` 调**绝对路径**（裸命令名解析不了，因为进程环境为空） |
+| 前端镜像构建报 `sh: vue-tsc: Permission denied` | 构建上下文把 Windows 的 `node_modules` 拷进了容器，而它的 `.bin` 没有可执行位。根目录的 `.containerignore` / `.dockerignore` 就是为此存在的，**不要删** |
+| `podman play kube` 报 `address already in use` | `scripts/dev-up.ps1` 的容器还占着 9000；先 `scripts/dev-down.ps1` |
+| `podman play kube` 报 `a dependency of container ... failed to start` | 多半是上面那条端口冲突的连带症状；也可能引用了不存在的镜像名（要用 `localhost/travel-blog-api:dev` 这种全名） |
 | 单次代码执行结束后进程被回收 | 长驻服务（后端 / Vite / 无头浏览器）必须在**同一次执行内**启动、验证、收尾 |

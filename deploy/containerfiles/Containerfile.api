@@ -1,0 +1,31 @@
+# 后端镜像：多阶段构建。
+#
+# 构建上下文是**仓库根目录**：
+#   podman build -f deploy/containerfiles/Containerfile.api -t travel-blog-api:dev .
+#
+# 本地网络拉 golang 基础镜像很慢时，可以用 scripts/k8s-build.ps1 —— 它先在本机交叉编译
+# （GOOS=linux），再用 Containerfile.api.local 打包，产物完全等价。
+ARG GO_VERSION=1.27
+FROM golang:${GO_VERSION}-alpine AS builder
+
+WORKDIR /src
+# 先只拷依赖清单，让 go mod download 这一层能被缓存
+COPY api/go.mod api/go.sum ./
+RUN go mod download
+
+COPY api/ ./
+# CGO_ENABLED=0 产出静态二进制，才能跑在 alpine/scratch 上
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata \
+ && adduser -D -u 10001 -g app app
+
+COPY --from=builder /out/server /usr/local/bin/server
+
+# 以非 root 运行；配合 K8s 的 securityContext 形成纵深防御
+USER 10001:10001
+EXPOSE 8000
+
+# 静态二进制 + distroless 风格的最小运行时
+ENTRYPOINT ["/usr/local/bin/server"]

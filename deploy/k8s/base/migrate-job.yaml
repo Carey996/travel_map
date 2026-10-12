@@ -1,0 +1,52 @@
+# 结构迁移 Job。
+#
+# 为什么不让 API 自己迁移：API 是多副本的，N 个 Pod 同时跑 DDL 会互相冲突
+# （CREATE TABLE 竞态）。所以 API 侧设 MIGRATE_ON_START=false，
+# 迁移收敛到这一个 Job 上。
+#
+# 即便如此，代码里仍加了 Postgres 咨询锁（见 api/internal/db）——
+# 重跑、并行 apply、或有人不小心把 MIGRATE_ON_START 打开，都不会出问题。
+#
+# 用法：先 apply 这个 Job 并等它完成，再 apply API Deployment：
+#   kubectl apply -f deploy/k8s/base/migrate-job.yaml
+#   kubectl -n travel-blog wait --for=condition=complete job/travel-blog-migrate --timeout=120s
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: travel-blog-migrate
+  namespace: travel-blog
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: travel-blog
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: migrate
+          image: travel-blog-api:dev
+          # 与 API 同一个镜像，只是换了入口参数
+          args: ["-migrate-only"]
+          envFrom:
+            - configMapRef:
+                name: travel-blog-config
+            - secretRef:
+                name: travel-blog-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

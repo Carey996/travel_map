@@ -1,0 +1,21 @@
+# 构建上下文排除项。
+#
+# 缺了它会有两个实际后果：
+#   1. Windows 上的 node_modules 会被 COPY 覆盖容器内已安装的那份，
+#      而它的 .bin/vue-tsc 没有可执行位 —— 前端镜像直接构建失败（permission denied）；
+#   2. 上下文体积从几 MB 涨到几百 MB，每次构建都要白传一遍。
+#
+# 注意：**不能排除 api/bin**，Containerfile.api.local 需要里面的交叉编译产物。
+.git
+.gitignore
+.logs
+.vscode
+.idea
+
+**/node_modules
+web/dist
+api/.venv
+api/bin/server.exe
+api/bin/server
+**/__pycache__
+*.log
