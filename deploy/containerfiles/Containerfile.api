@@ -3,8 +3,9 @@
 # 构建上下文是**仓库根目录**：
 #   podman build -f deploy/containerfiles/Containerfile.api -t travel-blog-api:dev .
 #
-# 本地网络拉 golang 基础镜像很慢时，可以用 scripts/k8s-build.ps1 —— 它先在本机交叉编译
-# （GOOS=linux），再用 Containerfile.api.local 打包，产物完全等价。
+# 本地网络拉 golang 基础镜像很慢时，可以先在本机交叉编译（GOOS=linux），
+# 再用 Containerfile.api.local 打包，产物完全等价。
+# 命令见仓库根 README「用 Kubernetes 部署」。
 ARG GO_VERSION=1.27
 FROM golang:${GO_VERSION}-alpine AS builder
 

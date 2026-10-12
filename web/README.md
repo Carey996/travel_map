@@ -20,8 +20,8 @@ npm install
 npm run dev        # http://127.0.0.1:5173
 ```
 
-后端需要同时运行（见 `../api/README.md`），或直接在仓库根目录用
-`scripts/dev.ps1` 一键启动前后端。
+后端需要同时运行（见 [`../api/README.md`](../api/README.md)）；依赖容器、后端、前端
+三者一起起的完整流程见仓库根 README 的「快速开始」。
 
 | 命令 | 作用 |
 |---|---|
@@ -118,7 +118,7 @@ web/
 
 | 文件 | 说明 |
 |---|---|
-| `api/client.ts` | `apiFetch` 统一加 `X-Requested-With`（CSRF）与 `credentials: 'include'`；`api` 对象暴露全部端点；类型与后端 Pydantic 模型一一对应 |
+| `api/client.ts` | `apiFetch` 统一加 `X-Requested-With`（CSRF）与 `credentials: 'include'`；`api` 对象暴露全部端点；类型与后端 DTO 一一对应 |
 | `i18n/index.ts` | `createI18n`（Composition 模式）、语言探测与持久化、`setLang()` |
 | `i18n/locales/zh.json` 与 `en.json` | 词条 |
 | `styles/base.css` | 全局与布局样式，**颜色全部引用 `--el-*` 变量**，暗色主题自动生效 |
@@ -240,4 +240,4 @@ Element Plus 的暗色变量挂在 `<html class="dark">` 上，`main.ts` 监听
 | 地图一片空白但大头针正常 | 底图源在该区域没有数据；换 `esri-street` 试试 |
 | 变更类请求返回 403 `csrf_header_missing` | 绕过了 `api/client.ts` 自己发了 fetch，没带 `X-Requested-With` |
 | `vue-tsc` 报 `Package subpath './lib/tsc' is not defined` | TypeScript 装成了 7.x；vue-tsc 需要 5.x，执行 `npm i -D typescript@^5.9` |
-| 开发时后端 500 且日志是连接被拒 | 依赖容器没起来，跑 `..\\scripts\\dev-up.ps1` |
+| 开发时后端 500 且日志是连接被拒 | 依赖容器没起来，按根 README「快速开始」第 1 步起 Postgres / Redis / MinIO |

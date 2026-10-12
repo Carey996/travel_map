@@ -106,18 +106,165 @@ README.md                              项目总览（本文件）
 
 ---
 
+## 快速开始（本地开发）
+
+> 下面全部是**通用 bash**，Linux / macOS / WSL / Git Bash 都能直接跑；把 `podman` 换成 `docker` 即可，
+> 两者的子命令在这里完全一致。仓库里**不含任何平台专属脚本**——每一步都以命令的形式写在文档里，
+> 复制粘贴就能跑通，不需要先信任一个 `.ps1`。
+
+### 前置条件
+
+- **Go ≥ 1.24**（本机 1.27）
+- **Node.js ≥ 20**
+- **Podman** 或 **Docker**（用来跑 Postgres / Redis / MinIO）
+- **bash**（Windows 下用 WSL 或 Git Bash）
+
+### 1. 启动依赖容器
+
+```bash
+# 网络与数据卷：已存在会报错，忽略即可（幂等）
+podman network create travelblog-net 2>/dev/null || true
+for v in pgdata redisdata miniodata; do podman volume create "travelblog-$v" 2>/dev/null || true; done
+
+podman run -d --restart=unless-stopped --name travelblog-postgres --network travelblog-net \
+  -p 5432:5432 \
+  -e POSTGRES_USER=travelblog -e POSTGRES_PASSWORD=travelblog -e POSTGRES_DB=travelblog \
+  -v travelblog-pgdata:/var/lib/postgresql/data \
+  docker.io/library/postgres:16-alpine
+
+# 主机端口用 16379 而不是 6379，原因见文末「排错备忘」
+podman run -d --restart=unless-stopped --name travelblog-redis --network travelblog-net \
+  -p 16379:6379 \
+  -v travelblog-redisdata:/data \
+  docker.io/library/redis:7-alpine redis-server --appendonly yes
+
+podman run -d --restart=unless-stopped --name travelblog-minio --network travelblog-net \
+  -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+  -v travelblog-miniodata:/data \
+  quay.io/minio/minio:latest server /data --console-address :9001
+```
+
+| 容器 | 地址 | 用途 |
+|---|---|---|
+| travelblog-postgres | localhost:5432 | 元数据 |
+| travelblog-redis | localhost:16379 | 会话 |
+| travelblog-minio | localhost:9000（控制台 9001） | 图片对象存储 |
+
+等它们真正可用再往下走（容器 Up ≠ 服务可用）：
+
+```bash
+until podman exec travelblog-postgres pg_isready -U travelblog -d travelblog >/dev/null 2>&1; do sleep 1; done
+until podman exec travelblog-redis redis-cli ping >/dev/null 2>&1; do sleep 1; done
+until curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; do sleep 1; done
+echo '依赖已就绪'
+```
+
+### 2. 安装依赖、准备配置
+
+```bash
+cp .env.example .env            # 默认值即可跑通本地开发
+
+cd api
+go env -w GOPROXY=https://goproxy.cn,direct   # 官方模块代理在国内不可达时才需要
+go mod download
+
+cd ../web
+npm install
+```
+
+MinIO 的 bucket 由后端启动时自动创建；**建表也不需要单独一步**——
+后端启动时会执行 GORM 的 `AutoMigrate`（只增不删，可重复执行）。
+
+### 3. 启动
+
+**方式 A · 两个终端**，各自看日志，适合开发：
+
+```bash
+# 终端 1：后端 API
+cd api && go run ./cmd/server        # http://127.0.0.1:8000
+
+# 终端 2：前端 Vite
+cd web && npm run dev                # http://127.0.0.1:5173
+```
+
+**方式 B · 一条命令后台起**，日志与 PID 落在 `.logs/`（已在 .gitignore 里）：
+
+```bash
+mkdir -p .logs
+( cd api && go build -o bin/server ./cmd/server && exec ./bin/server ) >.logs/api.log 2>&1 & echo $! >.logs/api.pid
+( cd web && npm run dev )                                              >.logs/web.log 2>&1 & echo $! >.logs/web.pid
+
+# 停止
+kill "$(cat .logs/api.pid)" "$(cat .logs/web.pid)" 2>/dev/null
+```
+
+打开 <http://127.0.0.1:5173>，注册一个账号即可开始。
+存活探针 <http://127.0.0.1:8000/healthz>，就绪探针 <http://127.0.0.1:8000/healthz/ready>
+（会逐项报告 Postgres / Redis / 对象存储哪个不通）。
+后端**没有 OpenAPI 文档页**，路由全表见下方「API 一览」。
+
+### 4. 停止
+
+```bash
+# 只停前后端（方式 B）
+kill "$(cat .logs/api.pid)" "$(cat .logs/web.pid)" 2>/dev/null
+
+# 停依赖容器；数据在具名卷里，删容器不丢数据
+podman rm -f travelblog-postgres travelblog-redis travelblog-minio
+# 连数据一起清掉
+podman volume rm travelblog-pgdata travelblog-redisdata travelblog-miniodata
+```
+
+---
+
+## 目录结构
+
+```
+travel_blog/
+  api/                        # Go + Gin 后端
+    cmd/server/               # 进程入口：装配与优雅关闭
+    internal/
+      config/                 # 环境变量配置与连接串归一化
+      model/  db/             # GORM 模型与连接、AutoMigrate
+      dto/                    # 请求校验与响应契约
+      handler/                # 路由与各资源处理器
+      middleware/             # CORS 与 CSRF
+      service/                # 照片自动聚类
+      storage/ session/ geocode/   # 对象存储、会话、地名
+    go.mod
+  web/                        # Vue 3 + Element Plus 前端
+    src/
+      components/             # MapCanvas / PlaceSidebar / PlaceDrawer / PhotoLightbox ...
+      lib/                    # 坐标纠偏、瓦片源、EXIF、上传编排、Markdown
+      api/client.ts           # 唯一的 API 出口（含 CSRF 头与 Cookie 约定）
+      i18n/                   # 中英双语
+  deploy/                     # 镜像定义、nginx 配置、K8s 清单
+  .env.example
+```
+
+---
+
 ## 用 Kubernetes 部署
 
 两套编排，**同一份镜像**：
 
-```powershell
-# 构建镜像（后端交叉编译 + 前端容器内构建）
-powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1
+```bash
+# 1. 构建镜像
+#    后端走「本机交叉编译 + 极简运行时镜像」：国内网络拉 golang 基础镜像经常超时，
+#    而 Go 交叉编译只需要一条环境变量，产物与多阶段构建完全等价（同为静态 linux/amd64、
+#    同一个 alpine 运行时、同样以非 root 运行）。想用标准多阶段构建，换成 Containerfile.api 即可。
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+  go build -C api -trimpath -ldflags '-s -w' -o bin/server-linux ./cmd/server
 
-# 本地验证：不需要集群，podman play kube 直接跑起同一个 Pod
-powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local   # -> http://127.0.0.1:8080
+podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/travel-blog-api:dev .
+podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
 
-# 生产：kustomize 应用到集群
+# 2A. 本地验证：不需要集群，podman play kube 直接跑起同一个 Pod
+podman play kube --replace deploy/k8s/local/pod.yaml     # -> http://127.0.0.1:8080
+podman play kube --down    deploy/k8s/local/pod.yaml
+
+# 2B. 生产：kustomize 应用到集群（先跑迁移 Job，再应用其余资源）
 kubectl apply -f deploy/k8s/base/migrate-job.yaml
 kubectl -n travel-blog wait --for=condition=complete job/travel-blog-migrate --timeout=180s
 kubectl apply -k deploy/k8s/base
@@ -132,93 +279,6 @@ kubectl apply -k deploy/k8s/base
   数据库挂了不该重启进程，而应摘掉流量
 
 细节见 [`deploy/README.md`](deploy/README.md)。
-
----
-
-## 快速开始（本地开发）
-
-
-### 前置条件
-
-- **Python ≥ 3.12**（本机为 3.14，全部依赖都有预编译轮子）与 [uv](https://docs.astral.sh/uv/)
-- **Node.js ≥ 20**
-- **Podman**（或 Docker）用于跑 Postgres / Redis / MinIO
-
-### 1. 启动依赖容器
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/dev-up.ps1
-```
-
-会创建并启动三个容器：
-
-| 容器 | 地址 | 用途 |
-|---|---|---|
-| travelblog-postgres | localhost:5432 | 元数据 |
-| travelblog-redis | localhost:6379 | 会话 |
-| travelblog-minio | localhost:9000（控制台 9001） | 图片对象存储 |
-
-### 2. 安装依赖
-
-```powershell
-cd api; go mod download   # 后端
-cd ..\web; npm install   # 前端
-```
-
-### 3. 配置环境变量
-
-```powershell
-Copy-Item .env.example .env
-```
-
-默认值即可直接跑通本地开发（MinIO 的 bucket 由后端启动时自动创建）。
-
-### 4. 拉取后端依赖
-
-```powershell
-cd api
-go env -w GOPROXY=https://goproxy.cn,direct   # 官方模块代理在国内不可达
-go mod download
-```
-
-建表不需要单独一步：后端启动时会执行 GORM 的 `AutoMigrate`（只增不删，可重复执行）。
-
-### 5. 一键启动
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/dev.ps1
-```
-
-打开 <http://127.0.0.1:5173>，注册一个账号即可开始。API 文档在 <http://127.0.0.1:8000/docs>。
-
-停止：`scripts\stop-dev.ps1`（只停前后端）或 `scripts\dev-down.ps1`（停依赖容器）。
-
----
-
-## 目录结构
-
-```
-travel_blog/
-  api/                        # Go + Gin 后端
-    cmd/server/               # 进程入口：装配与优雅关闭
-    internal/
-      config/                 # 环境变量配置
-      model/  db/             # GORM 模型与连接
-      dto/                    # 请求校验与响应契约
-      handler/                # 路由与各资源处理器
-      middleware/            # CORS 与 CSRF
-      service/                # 照片自动聚类
-      storage/ session/ geocode/   # 对象存储、会话、地名
-    go.mod
-  web/                        # Vue 3 + Element Plus 前端
-    src/
-      components/             # MapCanvas / PlaceSidebar / PlaceDrawer / PhotoLightbox ...
-      lib/                    # 坐标纠偏、瓦片源、EXIF、上传编排、Markdown
-      api/client.ts           # 唯一的 API 出口（含 CSRF 头与 Cookie 约定）
-      i18n/                   # 中英双语
-  scripts/                    # Podman 与开发流程脚本
-  .env.example
-```
 
 ---
 
@@ -301,7 +361,7 @@ GET    /api/v1/geo/reverse?lat=&lng=    经纬度 -> 地名
 GET    /api/v1/geo/search?q=            地名搜索
 ```
 
-所有错误统一为 `{"code": "...", "message": "...", "detail": {...}}`。
+所有错误统一为 `{"code": "...", "message": "...", "detail": {}}`。
 
 ---
 
@@ -346,13 +406,17 @@ GET    /api/v1/geo/search?q=            地名搜索
 
 - **Podman 拉不到镜像**：默认配置把 `docker.io` 指向了早已下线的 `docker.mirrors.ustc.edu.cn`。
   实测可用的替代是 `docker.m.daocloud.io`：
-  ```powershell
+  ```bash
   podman machine ssh "sed -i 's|docker.mirrors.ustc.edu.cn|docker.m.daocloud.io|' /etc/containers/registries.conf"
   podman machine stop; podman machine start   # 必须重启，服务进程会缓存旧配置
   ```
-- **PowerShell 脚本中文乱码报错**：Windows PowerShell 5.1 按 ANSI 读取 `.ps1`，
-  脚本必须保存为 **UTF-8 with BOM**（`scripts/` 下的脚本已处理）
-- **容器 Up 但连接被拒**：端口落在 Windows 保留段。用 `netsh interface ipv4 show excludedportrange protocol=tcp` 查看，换一个主机端口重建容器（本项目 Redis 就因为 6379 落在保留段而改用了 16379）
-- **`dial tcp [::1]:...`**：`localhost` 被解析成 IPv6，而容器端口只监听 IPv4；后端配置层已统一归一化为 `127.0.0.1`
-- **Compose provider 缺失**：`podman compose` 需要 `docker-compose` 或 `podman-compose`，
-  本项目的脚本直接用 `podman run`，不依赖它
+- **容器 Up 但连接被拒**：端口落在 Windows 保留段。用
+  `netsh interface ipv4 show excludedportrange protocol=tcp` 查看，
+  换一个主机端口重建容器（本项目 Redis 就因为 6379 落在保留段而改用了 16379）
+- **`dial tcp [::1]:...`**：`localhost` 被解析成 IPv6，而容器端口只监听 IPv4；
+  后端配置层已统一归一化为 `127.0.0.1`
+- **`podman play kube` 报 `address already in use`**：上面那套开发容器还占着 9000；
+  先 `podman rm -f travelblog-minio`。另外 `play kube` 只认全名，
+  清单里的镜像必须写成 `localhost/travel-blog-api:dev` 这种形式
+- **`podman compose` 不可用**：它需要 `docker-compose` 或 `podman-compose` 提供者；
+  本项目上面的命令直接用 `podman run`，不依赖它

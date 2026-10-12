@@ -14,22 +14,22 @@
 
 ## 快速开始
 
-```powershell
+```bash
 # 1. 依赖容器（Postgres / Redis / MinIO）
-powershell -ExecutionPolicy Bypass -File ..\scripts\dev-up.ps1
+#    完整命令在仓库根 README「快速开始」；已经在跑就跳过这一步
 
 # 2. 拉依赖（国内需先把模块代理指向 goproxy.cn）
 go env -w GOPROXY=https://goproxy.cn,direct
 go mod download
 
 # 3. 配置：默认值即可跑通本地开发
-Copy-Item ..\.env.example ..\.env
+cp ../.env.example ../.env
 
 # 4. 运行（首次启动会自动建表）
 go run ./cmd/server
 
 # 或编译成单文件再跑
-go build -o bin/server.exe ./cmd/server; .\bin\server.exe
+go build -o bin/server ./cmd/server && ./bin/server
 ```
 
 - 存活探针：<http://127.0.0.1:8000/healthz>

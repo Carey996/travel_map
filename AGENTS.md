@@ -68,34 +68,40 @@ origin = https://github.com/Carey996/travel_map
 
 ## 四、常用命令
 
-```powershell
-# 依赖容器（Podman，不是 Docker）
-powershell -ExecutionPolicy Bypass -File scripts\dev-up.ps1
+**仓库里只写 bash 命令**——平台无关，Linux / macOS / WSL / Git Bash 都能跑；
+完整可复制的一套在根 README 的「快速开始」与「用 Kubernetes 部署」两节。
 
-# 一键启动前后端（会自动等待就绪并打印地址）
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
+```bash
+# 依赖容器（Postgres / Redis / MinIO）：命令见根 README「快速开始」第 1 步
+until podman exec travelblog-postgres pg_isready -U travelblog -d travelblog >/dev/null 2>&1; do sleep 1; done
 
 # 单独跑后端 / 前端
-cd api; go run ./cmd/server
-cd web; npm run dev
+cd api && go run ./cmd/server          # http://127.0.0.1:8000
+cd web && npm run dev                  # http://127.0.0.1:5173
 
 # 类型检查与构建
-cd web; npx vue-tsc --noEmit; npx vite build
+cd web && npx vue-tsc --noEmit && npx vite build
 
 # 后端依赖与构建（国内需先把模块代理指向 goproxy.cn）
 go env -w GOPROXY=https://goproxy.cn,direct
 go mod tidy
-go build -o bin/server.exe ./cmd/server
+cd api && go build -o bin/server ./cmd/server
 
-# Kubernetes / 容器
-powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1        # 构建前后端镜像
-powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local   # podman play kube 本地跑（不需要集群）
-powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Down    # 停本地 Pod
+# 镜像与本地 K8s Pod
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C api -trimpath -ldflags '-s -w' -o bin/server-linux ./cmd/server
+podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/travel-blog-api:dev .
+podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
+podman play kube --replace deploy/k8s/local/pod.yaml   # 本地跑，不需要集群
+podman play kube --down    deploy/k8s/local/pod.yaml
 
 # 停止
-powershell -ExecutionPolicy Bypass -File scripts\stop-dev.ps1   # 只停前后端
-powershell -ExecutionPolicy Bypass -File scripts\dev-down.ps1   # 停依赖容器
+kill "$(cat .logs/api.pid)" "$(cat .logs/web.pid)" 2>/dev/null   # 只停前后端
+podman rm -f travelblog-postgres travelblog-redis travelblog-minio   # 停依赖容器
 ```
+
+**`scripts/*.ps1` 是本机自用的 PowerShell 脚本，已写进 `.gitignore`，不在仓库里**，
+文档也不要再引用它们。本机仍可直接跑（`dev-up.ps1` / `dev.ps1` / `dev-down.ps1` /
+`stop-dev.ps1` / `k8s-build.ps1` / `k8s-up.ps1`），但对外只暴露上面的 bash 命令。
 
 ---
 
@@ -127,17 +133,17 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-down.ps1   # 停依赖容�
 
 | 现象 | 原因与处理 |
 |---|---|
-| 容器起不来 / 接口 500 且日志是连接被拒 | Podman 机器重启后容器会停，跑 `scripts\dev-up.ps1` |
+| 容器起不来 / 接口 500 且日志是连接被拒 | Podman 机器重启后容器会停，重跑根 README「快速开始」第 1 步（本机也可 `scripts\dev-up.ps1`） |
 | `go mod download` 卡住 | `go env -w GOPROXY=https://goproxy.cn,direct`（官方 proxy 在本机不可达） |
 | 容器 Up 但连接被拒 | 端口落在 **Windows 保留段**；`netsh interface ipv4 show excludedportrange protocol=tcp` 查看，换主机端口重建容器（本项目 Redis 因此用 16379） |
 | `dial tcp [::1]:...` | `localhost` 被解析成 IPv6；配置层已统一归一化为 127.0.0.1 |
 | PowerShell 脚本中文乱码报错 | Windows PowerShell 5.1 按 ANSI 读 `.ps1`，脚本必须存为 **UTF-8 with BOM** |
-| `podman` 找不到 | 脚本已内置多路径回退解析；PATH 里没有也能跑 |
+| `podman` 找不到 | 本机在 `%LOCALAPPDATA%\Programs\Podman\podman.exe`；调外部命令时用绝对路径 |
 | `vue-tsc` 报 `Package subpath './lib/tsc' is not defined` | TypeScript 装成了 7.x，需 `npm i -D typescript@^5.9` |
 | 无头浏览器 CDP 起不来（`bind() 0x271D`） | 端口落在保留段，换端口 |
 | `github.com` 时通时不通 | `api.github.com` 与 `codeload.github.com` 稳定，`github.com` 间歇；大文件下载基本过不去 |
 | 用 `pwsh` 工具执行命令失败 | 该工具在本机不稳定；改用 Node 的 `child_process` 调**绝对路径**（裸命令名解析不了，因为进程环境为空） |
 | 前端镜像构建报 `sh: vue-tsc: Permission denied` | 构建上下文把 Windows 的 `node_modules` 拷进了容器，而它的 `.bin` 没有可执行位。根目录的 `.containerignore` / `.dockerignore` 就是为此存在的，**不要删** |
-| `podman play kube` 报 `address already in use` | `scripts/dev-up.ps1` 的容器还占着 9000；先 `scripts/dev-down.ps1` |
+| `podman play kube` 报 `address already in use` | 开发容器还占着 9000；先 `podman rm -f travelblog-minio`（本机也可 `scripts/dev-down.ps1`） |
 | `podman play kube` 报 `a dependency of container ... failed to start` | 多半是上面那条端口冲突的连带症状；也可能引用了不存在的镜像名（要用 `localhost/travel-blog-api:dev` 这种全名） |
 | 单次代码执行结束后进程被回收 | 长驻服务（后端 / Vite / 无头浏览器）必须在**同一次执行内**启动、验证、收尾 |

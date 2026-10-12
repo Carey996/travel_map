@@ -18,8 +18,8 @@ deploy/
 
 | 方式 | 命令 | 适用 |
 |---|---|---|
-| **Kubernetes** | `scripts/k8s-up.ps1`（有 kubectl 时走 kustomize） | 生产 / 集群 |
-| **本地单 Pod** | `scripts/k8s-up.ps1 -Local`（`podman play kube`） | 开发机验证，不需要集群 |
+| **Kubernetes** | `kubectl apply -k deploy/k8s/base`（迁移 Job 先跑） | 生产 / 集群 |
+| **本地单 Pod** | `podman play kube deploy/k8s/local/pod.yaml` | 开发机验证，不需要集群 |
 
 两条路径**用的是同一份镜像**，差异只在编排方式。
 本地单 Pod 的存在意义是：让清单里用到的镜像、环境变量、探针真的被跑过一遍，
@@ -27,12 +27,15 @@ deploy/
 
 ## 快速开始
 
-```powershell
+```bash
 # 1. 构建镜像（后端交叉编译 + 前端容器内构建）
-powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+  go build -C api -trimpath -ldflags '-s -w' -o bin/server-linux ./cmd/server
+podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/travel-blog-api:dev .
+podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
 
 # 2A. 本地跑（不需要集群）
-powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local
+podman play kube --replace deploy/k8s/local/pod.yaml
 #     -> 打开 http://127.0.0.1:8080
 
 # 2B. 部署到集群
@@ -41,7 +44,7 @@ kubectl -n travel-blog wait --for=condition=complete job/travel-blog-migrate --t
 kubectl apply -k deploy/k8s/base
 
 # 3. 停止本地 Pod
-powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Down
+podman play kube --down deploy/k8s/local/pod.yaml
 ```
 
 ## 三条值得先知道的设计

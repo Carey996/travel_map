@@ -35,4 +35,4 @@
 ## 相关
 
 - 上级：[`deploy/`](../README.md)
-- 拉起脚本：[`scripts/k8s-up.ps1`](../../scripts/k8s-up.ps1)
+- 拉起命令：[项目根 README · 用 Kubernetes 部署](../../README.md#用-kubernetes-部署)
