@@ -142,8 +142,9 @@ podman rm -f travelblog-postgres travelblog-redis travelblog-minio   # 停依赖
 | `vue-tsc` 报 `Package subpath './lib/tsc' is not defined` | TypeScript 装成了 7.x，需 `npm i -D typescript@^5.9` |
 | 无头浏览器 CDP 起不来（`bind() 0x271D`） | 端口落在保留段，换端口 |
 | `github.com` 时通时不通 | `api.github.com` 与 `codeload.github.com` 稳定，`github.com` 间歇；大文件下载基本过不去 |
-| 用 `pwsh` 工具执行命令失败 | 该工具在本机不稳定；改用 Node 的 `child_process` 调**绝对路径**（裸命令名解析不了，因为进程环境为空） |
+| 用 `pwsh` 工具执行命令失败 / PowerShell 里原生程序没有输出 | 该工具在本机不稳定；且经 DSH 起的 PowerShell 拉不起原生子进程（`podman ps` 空输出、`$LASTEXITCODE` 为空），**别用它验证脚本**。改用 Node 的 `child_process` 调**绝对路径**；纯 .NET 的 PS 逻辑（AST 解析、TcpClient）仍可用 |
 | 前端镜像构建报 `sh: vue-tsc: Permission denied` | 构建上下文把 Windows 的 `node_modules` 拷进了容器，而它的 `.bin` 没有可执行位。根目录的 `.containerignore` / `.dockerignore` 就是为此存在的，**不要删** |
 | `podman play kube` 报 `address already in use` | 开发容器还占着 9000；先 `podman rm -f travelblog-minio`（本机也可 `scripts/dev-down.ps1`） |
 | `podman play kube` 报 `a dependency of container ... failed to start` | 多半是上面那条端口冲突的连带症状；也可能引用了不存在的镜像名（要用 `localhost/travel-blog-api:dev` 这种全名） |
+| **两套编排互相抢端口** | 「快速开始」的开发容器与 `podman play kube` 的本地 Pod 都要 8080 / 9000，**不能同时跑**：Pod 在跑时 `dev-up.ps1` 会先做端口预检并提示 `podman play kube --down`；反过来会报 `listen tcp4 :9000: bind: address already in use` |
 | 单次代码执行结束后进程被回收 | 长驻服务（后端 / Vite / 无头浏览器）必须在**同一次执行内**启动、验证、收尾 |
