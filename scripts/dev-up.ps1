@@ -17,12 +17,13 @@ $ErrorActionPreference = 'Stop'
 function Resolve-Podman {
   $cmd = Get-Command podman -ErrorAction SilentlyContinue
   if ($cmd -and $cmd.Source) { return $cmd.Source }
-  $candidates = @(
-    (Join-Path $env:LOCALAPPDATA 'Programs\Podman\podman.exe'),
-    (Join-Path $env:ProgramFiles 'RedHat\Podman\podman.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'RedHat\Podman\podman.exe'),
-    'C:\Program Files\Podman\podman.exe'
-  )
+  # 逐个判断：某些环境（IDE 终端、CI）里这些变量可能不存在，
+  # 直接丢给 Join-Path 会因参数为空而抛错
+  $candidates = @()
+  if ($env:LOCALAPPDATA) { $candidates += (Join-Path $env:LOCALAPPDATA 'Programs\Podman\podman.exe') }
+  if ($env:ProgramFiles) { $candidates += (Join-Path $env:ProgramFiles 'RedHat\Podman\podman.exe') }
+  if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} 'RedHat\Podman\podman.exe') }
+  $candidates += 'C:\Program Files\Podman\podman.exe'
   foreach ($candidate in $candidates) {
     if ($candidate -and (Test-Path $candidate)) { return $candidate }
   }
@@ -116,7 +117,7 @@ Ensure-Running -Name $PgName -RunArgs @(
 
 Ensure-Running -Name $RedisName -RunArgs @(
   '--network', $Network,
-  '-p', '6379:6379',
+  '-p', '16379:6379',
   '-v', 'travelblog-redisdata:/data',
   $RedisImage,
   'redis-server', '--appendonly', 'yes'
@@ -132,6 +133,23 @@ Ensure-Running -Name $MinioName -RunArgs @(
   $MinioImage,
   'server', '/data', '--console-address', ':9001'
 )
+
+# 容器内服务就绪 != 主机端口可达。
+# Podman/WSL 的端口转发偶尔会失效（表现为「容器 Up、内部能连、外部连接被拒」），
+# 只检查容器内部会漏掉这种情况，所以再单独探一次主机端口。
+function Test-HostPort {
+  param([int]$Port, [int]$TimeoutMs = 2500)
+  $client = New-Object System.Net.Sockets.TcpClient
+  try {
+    $task = $client.ConnectAsync('127.0.0.1', $Port)
+    if ($task.Wait($TimeoutMs)) { return $client.Connected }
+    return $false
+  } catch {
+    return $false
+  } finally {
+    $client.Close()
+  }
+}
 
 Write-Host '==> 等待服务就绪' -ForegroundColor Cyan
 $ok = $true
@@ -155,6 +173,22 @@ if ($minioReady) {
   $ok = $false
 }
 
+Write-Host '==> 校验主机端口转发' -ForegroundColor Cyan
+$portChecks = @(
+  @{ Name = 'Postgres'; Port = 5432 },
+  @{ Name = 'Redis';    Port = 16379 },
+  @{ Name = 'MinIO';    Port = 9000 }
+)
+foreach ($check in $portChecks) {
+  if (Test-HostPort -Port $check.Port) {
+    Write-Host ('  [ok]    ' + $check.Name + ' 端口 ' + $check.Port + ' 可访问') -ForegroundColor Green
+  } else {
+    Write-Host ('  [FAIL]  ' + $check.Name + ' 端口 ' + $check.Port + ' 不可访问——容器可能在跑但端口转发失效') -ForegroundColor Red
+    Write-Host ('          可尝试：podman rm -f travelblog-' + $check.Name.ToLower() + '; 之后重跑本脚本') -ForegroundColor DarkGray
+    $ok = $false
+  }
+}
+
 Write-Host ''
 if ($ok) {
   Write-Host '全部依赖已就绪：' -ForegroundColor Green
@@ -162,6 +196,6 @@ if ($ok) {
   Write-Host '部分依赖未就绪，请检查上面的日志：' -ForegroundColor Yellow
 }
 Write-Host ('  Postgres    postgresql://{0}:{1}@localhost:5432/{2}' -f $PgUser, $PgPassword, $PgDb)
-Write-Host '  Redis       redis://localhost:6379/0'
+Write-Host '  Redis       redis://127.0.0.1:16379/0'
 Write-Host '  MinIO API   http://localhost:9000   (bucket: travelblog，后端启动时自动创建)'
 Write-Host ('  MinIO 控制台 http://localhost:9001  ({0} / {1})' -f $MinioUser, $MinioPassword)

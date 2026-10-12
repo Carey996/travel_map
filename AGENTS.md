@@ -60,7 +60,7 @@ origin = https://github.com/Carey996/travel_map
    注意这与 react-i18next 相反。
 4. **后端保持无状态。** 不存进程内会话、不写本地磁盘、不做进程内缓存、不接收图片字节流。
    图片一律由浏览器经预签名 URL 直传对象存储。
-5. **照片响应必须经 `photo_to_out()` 生成**（`api/app/schemas/photo.py`），
+5. **照片响应必须经 `dto.NewPhotoOut()` 生成**（`api/internal/dto/photo.go`），
    它负责把对象键换成预签名直链。直接返回 ORM 对象会泄露存储键、前端也拿不到可用地址。
 6. **每个数据库查询都要带 `user_id` 过滤**，这是多租户隔离的唯一防线。
 
@@ -76,15 +76,16 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-up.ps1
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 
 # 单独跑后端 / 前端
-cd api; .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+cd api; go run ./cmd/server
 cd web; npm run dev
 
 # 类型检查与构建
 cd web; npx vue-tsc --noEmit; npx vite build
 
-# 数据库迁移
-cd api; .venv\Scripts\python.exe -m alembic revision --autogenerate -m "描述"
-cd api; .venv\Scripts\python.exe -m alembic upgrade head
+# 后端依赖与构建（国内需先把模块代理指向 goproxy.cn）
+go env -w GOPROXY=https://goproxy.cn,direct
+go mod tidy
+go build -o bin/server.exe ./cmd/server
 
 # 停止
 powershell -ExecutionPolicy Bypass -File scripts\stop-dev.ps1   # 只停前后端
@@ -122,7 +123,9 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-down.ps1   # 停依赖容�
 | 现象 | 原因与处理 |
 |---|---|
 | 容器起不来 / 接口 500 且日志是连接被拒 | Podman 机器重启后容器会停，跑 `scripts\dev-up.ps1` |
-| `alembic` 报 `UnicodeDecodeError` | 它用系统区域编码读 `alembic.ini`，该文件里**不能有中文注释** |
+| `go mod download` 卡住 | `go env -w GOPROXY=https://goproxy.cn,direct`（官方 proxy 在本机不可达） |
+| 容器 Up 但连接被拒 | 端口落在 **Windows 保留段**；`netsh interface ipv4 show excludedportrange protocol=tcp` 查看，换主机端口重建容器（本项目 Redis 因此用 16379） |
+| `dial tcp [::1]:...` | `localhost` 被解析成 IPv6；配置层已统一归一化为 127.0.0.1 |
 | PowerShell 脚本中文乱码报错 | Windows PowerShell 5.1 按 ANSI 读 `.ps1`，脚本必须存为 **UTF-8 with BOM** |
 | `podman` 找不到 | 脚本已内置多路径回退解析；PATH 里没有也能跑 |
 | `vue-tsc` 报 `Package subpath './lib/tsc' is not defined` | TypeScript 装成了 7.x，需 `npm i -D typescript@^5.9` |

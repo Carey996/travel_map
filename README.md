@@ -3,7 +3,7 @@
 一个以**地图为首页**的旅行记录应用：上传旅途中拍摄的照片，自动读取 EXIF 里的 GPS 坐标，
 在真实地图上生成地点大头针；选择任意城市或地点，为它写下旅行笔记。
 
-前端 Vue 3 + Element Plus，后端 FastAPI，**前后端完全分离**，后端保持无状态。
+前端 Vue 3 + Element Plus，后端 Go + Gin，**前后端完全分离**，后端保持无状态。
 
 ---
 
@@ -14,17 +14,22 @@
 
 ```
 README.md                              项目总览（本文件）
-├── api/README.md                      后端总览
-│   ├── app/README.md                  应用包：分层结构与单向依赖
-│   │   ├── core/README.md             配置、安全、错误、CSRF、UUID v7
-│   │   ├── db/README.md               异步引擎、ORM 模型、迁移元数据
-│   │   ├── schemas/README.md          Pydantic 契约
-│   │   ├── services/README.md         对象存储、地点聚类、会话、地名
-│   │   └── api/README.md              依赖注入与参数解析
-│   │       └── v1/README.md           版本化业务路由
-│   ├── alembic/README.md              迁移环境与命令
-│   │   └── versions/README.md         迁移脚本清单
-│   └── tests/README.md                测试现状与补测建议
+├── api/README.md                      后端总览（Go + Gin）
+│   ├── cmd/README.md                  可执行入口
+│   │   └── server/README.md           进程装配与优雅关闭
+│   └── internal/README.md             实现总览与依赖方向
+│       ├── config/README.md           环境变量与连接串归一化
+│       ├── apperr/README.md           统一错误形状
+│       ├── model/README.md            GORM 模型、UUID v7、jsonb 字段
+│       ├── db/README.md               连接池与 AutoMigrate
+│       ├── dto/README.md              请求校验与响应契约
+│       ├── geo/README.md              Haversine 距离
+│       ├── geocode/README.md          Photon / Nominatim 代理
+│       ├── storage/README.md          S3 预签名
+│       ├── session/README.md          Redis / Postgres 会话存储
+│       ├── service/README.md          照片自动聚类
+│       ├── middleware/README.md       CORS 与 CSRF
+│       └── handler/README.md          路由与各资源处理器
 └── web/README.md                      前端总览
     └── src/README.md                  前端源码分层与依赖方向
         ├── components/README.md       7 个视图组件的职责与硬约束
@@ -41,7 +46,7 @@ README.md                              项目总览（本文件）
 | 文档 | 内容 |
 |---|---|
 | **本文件** | 项目总览、架构、快速开始、关键设计决策、底图选型实测数据 |
-| [`api/README.md`](api/README.md) | 后端：目录索引、请求生命周期、数据模型、迁移工作流、无状态约束 |
+| [`api/README.md`](api/README.md) | 后端：知识树导航、分层与依赖方向、请求生命周期、数据模型、无状态约束 |
 | [`web/README.md`](web/README.md) | 前端：组件索引、状态流、坐标与 i18n 约定、上传管线、构建产物 |
 
 ---
@@ -69,7 +74,7 @@ README.md                              项目总览（本文件）
 └──────────┬───────────┘
            │ /api/v1  (JSON)
 ┌──────────▼───────────┐        ┌──────────────────────┐
-│  FastAPI（无状态）     │───────▶│  Postgres（元数据）    │
+│  Gin（无状态）         │───────▶│  Postgres（元数据）    │
 │  · 不存会话/不落盘      │        └──────────────────────┘
 │  · 不接收图片字节流     │        ┌──────────────────────┐
 └──────────────────────┘───────▶│  Redis（会话）         │
@@ -119,7 +124,7 @@ powershell -ExecutionPolicy Bypass -File scripts/dev-up.ps1
 ### 2. 安装依赖
 
 ```powershell
-cd api; uv sync      # 后端
+cd api; go mod download   # 后端
 cd ..\web; npm install   # 前端
 ```
 
@@ -131,12 +136,15 @@ Copy-Item .env.example .env
 
 默认值即可直接跑通本地开发（MinIO 的 bucket 由后端启动时自动创建）。
 
-### 4. 建表
+### 4. 拉取后端依赖
 
 ```powershell
 cd api
-.venv\Scripts\python.exe -m alembic upgrade head
+go env -w GOPROXY=https://goproxy.cn,direct   # 官方模块代理在国内不可达
+go mod download
 ```
+
+建表不需要单独一步：后端启动时会执行 GORM 的 `AutoMigrate`（只增不删，可重复执行）。
 
 ### 5. 一键启动
 
@@ -154,15 +162,17 @@ powershell -ExecutionPolicy Bypass -File scripts/dev.ps1
 
 ```
 travel_blog/
-  api/                        # FastAPI 后端
-    app/
-      main.py                 # 应用入口与 lifespan
-      core/                   # 配置、安全、错误、中间件、坐标计算
-      db/                     # SQLAlchemy 模型与引擎
-      schemas/                # Pydantic 请求/响应模型
-      services/               # 对象存储、会话、地名、地点聚类
-      api/v1/                 # 路由：auth / places / photos / notes / geo
-    alembic/                  # 数据库迁移
+  api/                        # Go + Gin 后端
+    cmd/server/               # 进程入口：装配与优雅关闭
+    internal/
+      config/                 # 环境变量配置
+      model/  db/             # GORM 模型与连接
+      dto/                    # 请求校验与响应契约
+      handler/                # 路由与各资源处理器
+      middleware/            # CORS 与 CSRF
+      service/                # 照片自动聚类
+      storage/ session/ geocode/   # 对象存储、会话、地名
+    go.mod
   web/                        # Vue 3 + Element Plus 前端
     src/
       components/             # MapCanvas / PlaceSidebar / PlaceDrawer / PhotoLightbox ...
@@ -305,6 +315,7 @@ GET    /api/v1/geo/search?q=            地名搜索
   ```
 - **PowerShell 脚本中文乱码报错**：Windows PowerShell 5.1 按 ANSI 读取 `.ps1`，
   脚本必须保存为 **UTF-8 with BOM**（`scripts/` 下的脚本已处理）
-- **`alembic.ini` 读取失败**：alembic 用系统区域编码读配置，配置文件里不要写中文注释
+- **容器 Up 但连接被拒**：端口落在 Windows 保留段。用 `netsh interface ipv4 show excludedportrange protocol=tcp` 查看，换一个主机端口重建容器（本项目 Redis 就因为 6379 落在保留段而改用了 16379）
+- **`dial tcp [::1]:...`**：`localhost` 被解析成 IPv6，而容器端口只监听 IPv4；后端配置层已统一归一化为 `127.0.0.1`
 - **Compose provider 缺失**：`podman compose` 需要 `docker-compose` 或 `podman-compose`，
   本项目的脚本直接用 `podman run`，不依赖它

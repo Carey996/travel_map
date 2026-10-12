@@ -30,11 +30,10 @@ function Resolve-Node {
   # 先查 PATH，再回退到常见安装位置——不同终端环境下 PATH 未必完整
   $cmd = Get-Command node -ErrorAction SilentlyContinue
   if ($cmd -and $cmd.Source) { return $cmd.Source }
-  $candidates = @(
-    (Join-Path $env:ProgramFiles 'nodejs\node.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'nodejs\node.exe'),
-    (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe')
-  )
+  $candidates = @()
+  if ($env:ProgramFiles) { $candidates += (Join-Path $env:ProgramFiles 'nodejs\node.exe') }
+  if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} 'nodejs\node.exe') }
+  if ($env:LOCALAPPDATA) { $candidates += (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe') }
   foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
   return $null
 }
