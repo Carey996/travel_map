@@ -126,23 +126,28 @@ README.md                              项目总览（本文件）
 podman network create travelblog-net 2>/dev/null || true
 for v in pgdata redisdata miniodata; do podman volume create "travelblog-$v" 2>/dev/null || true; done
 
-podman run -d --restart=unless-stopped --name travelblog-postgres --network travelblog-net \
-  -p 5432:5432 \
-  -e POSTGRES_USER=travelblog -e POSTGRES_PASSWORD=travelblog -e POSTGRES_DB=travelblog \
-  -v travelblog-pgdata:/var/lib/postgresql/data \
-  docker.io/library/postgres:16-alpine
+# 每段都是「已存在就 start，不存在才创建」——Podman 机器重启后容器会停，
+# 重跑这一整段即可，不会报 name already in use
+podman start travelblog-postgres >/dev/null 2>&1 || \
+  podman run -d --restart=unless-stopped --name travelblog-postgres --network travelblog-net \
+    -p 5432:5432 \
+    -e POSTGRES_USER=travelblog -e POSTGRES_PASSWORD=travelblog -e POSTGRES_DB=travelblog \
+    -v travelblog-pgdata:/var/lib/postgresql/data \
+    docker.io/library/postgres:16-alpine
 
 # 主机端口用 16379 而不是 6379，原因见文末「排错备忘」
-podman run -d --restart=unless-stopped --name travelblog-redis --network travelblog-net \
-  -p 16379:6379 \
-  -v travelblog-redisdata:/data \
-  docker.io/library/redis:7-alpine redis-server --appendonly yes
+podman start travelblog-redis >/dev/null 2>&1 || \
+  podman run -d --restart=unless-stopped --name travelblog-redis --network travelblog-net \
+    -p 16379:6379 \
+    -v travelblog-redisdata:/data \
+    docker.io/library/redis:7-alpine redis-server --appendonly yes
 
-podman run -d --restart=unless-stopped --name travelblog-minio --network travelblog-net \
-  -p 9000:9000 -p 9001:9001 \
-  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-  -v travelblog-miniodata:/data \
-  quay.io/minio/minio:latest server /data --console-address :9001
+podman start travelblog-minio >/dev/null 2>&1 || \
+  podman run -d --restart=unless-stopped --name travelblog-minio --network travelblog-net \
+    -p 9000:9000 -p 9001:9001 \
+    -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+    -v travelblog-miniodata:/data \
+    quay.io/minio/minio:latest server /data --console-address :9001
 ```
 
 | 容器 | 地址 | 用途 |
@@ -192,8 +197,12 @@ cd web && npm run dev                # http://127.0.0.1:5173
 
 ```bash
 mkdir -p .logs
-( cd api && go build -o bin/server ./cmd/server && exec ./bin/server ) >.logs/api.log 2>&1 & echo $! >.logs/api.pid
-( cd web && npm run dev )                                              >.logs/web.log 2>&1 & echo $! >.logs/web.pid
+# go env GOEXE 在 Windows 上是 .exe、在 Linux / macOS 上是空串，两个平台都能直接 exec
+( cd api && go build -o "bin/server$(go env GOEXE)" ./cmd/server && exec "./bin/server$(go env GOEXE)" ) \
+  >.logs/api.log 2>&1 & echo $! >.logs/api.pid
+# 前端直接跑 vite 的可执行入口而不是 npm run dev：npm 会把 vite 当子进程启动，
+# 记下的是 npm 的 PID，kill 掉它之后 vite 仍然占着 5173
+( cd web && exec node ./node_modules/vite/bin/vite.js ) >.logs/web.log 2>&1 & echo $! >.logs/web.pid
 
 # 停止
 kill "$(cat .logs/api.pid)" "$(cat .logs/web.pid)" 2>/dev/null
