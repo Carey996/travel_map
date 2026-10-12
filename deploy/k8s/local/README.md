@@ -6,13 +6,13 @@
 |---|---|
 | `pod.yaml` | 单 Pod，5 个容器 + Podman 自动创建的 infra 容器 |
 
-`F`powershell
+```powershell
 podman play kube deploy/k8s/local/pod.yaml
 podman play kube --down deploy/k8s/local/pod.yaml
 
 # 或走脚本（会先构建镜像）
 powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Local
-`F`
+```
 
 ## 为什么是一个 Pod 而不是五个
 

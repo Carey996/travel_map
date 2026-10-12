@@ -5,14 +5,14 @@
 把两个应用打包成容器、并用 Kubernetes 清单拉起的全部材料。
 **不含任何业务代码。**
 
-`F`
+```
 deploy/
 ├── containerfiles/   容器镜像定义（后端 / 前端）
 ├── nginx/            前端容器的 nginx 配置模板（含 /api 反代）
 └── k8s/
     ├── base/         生产向的完整清单（kustomize 基础层）
     └── local/        单 Pod 版本，用 podman 直接跑起来验证
-`F`
+```
 
 ## 两种拉起方式
 
@@ -27,7 +27,7 @@ deploy/
 
 ## 快速开始
 
-`F`powershell
+```powershell
 # 1. 构建镜像（后端交叉编译 + 前端容器内构建）
 powershell -ExecutionPolicy Bypass -File scripts\k8s-build.ps1
 
@@ -42,7 +42,7 @@ kubectl apply -k deploy/k8s/base
 
 # 3. 停止本地 Pod
 powershell -ExecutionPolicy Bypass -File scripts\k8s-up.ps1 -Down
-`F`
+```
 
 ## 三条值得先知道的设计
 

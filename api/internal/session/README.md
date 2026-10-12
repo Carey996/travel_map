@@ -27,10 +27,10 @@ Redis 直接以它为键，Postgres 存 sha256 摘要。因此即使存储泄露
 
 ## Redis 实现的两个键
 
-`F`
+```
 tb:sess:<sid>            -> user_id，带 TTL
 tb:user:<user_id>:sess   -> 该用户的 sid 集合（用于「退出所有设备」）
-`F`
+```
 
 反向索引不能省：没有它就无法实现 `RevokeAllForUser()`，
 而「登出所有设备」是安全基本盘。

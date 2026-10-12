@@ -16,9 +16,9 @@
 
 ## Migrate
 
-`F`go
+```go
 gdb.AutoMigrate(model.AllModels()...)
-`F`
+```
 
 **与 Python 版的 Alembic 是两种思路，需要理解差异：**
 

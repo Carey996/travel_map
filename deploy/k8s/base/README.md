@@ -19,11 +19,11 @@
 
 ## 部署顺序不是可有可无的
 
-`F`powershell
+```powershell
 kubectl apply -f deploy/k8s/base/migrate-job.yaml
 kubectl -n travel-blog wait --for=condition=complete job/travel-blog-migrate --timeout=180s
 kubectl apply -k deploy/k8s/base
-`F`
+```
 
 `kubectl apply -k` 是一次性提交所有资源的，它**不保证顺序**。
 如果 API 先于迁移就绪，它会在表不存在时报错——就绪探针会一直失败，直到 Job 完成。

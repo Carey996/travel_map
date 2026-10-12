@@ -37,13 +37,13 @@
 
 `CreatePhoto` / `UpdatePhoto` 里有一段：
 
-`F`go
+```go
 // AssignPhoto 只改内存里的 photo.PlaceID，而这一行是插入之后才确定的，
 // 因此必须显式回写一次。
 if place != nil {
     tx.Model(&model.Photo{}).Where("id = ?", photo.ID).Update("place_id", place.ID)
 }
-`F`
+```
 
 早期版本的条件是「值不同才更新」，而 `service.AssignPhoto()` 恰好已经把它设成了
 同一个值——于是**唯一需要写库的那次被跳过**。症状很有迷惑性：

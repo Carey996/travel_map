@@ -7,7 +7,7 @@
 
 ## 依赖方向
 
-`F`
+```
 handler/       HTTP 层：路由、鉴权、请求校验、响应序列化
   ├─ dto/      契约模型（只被 handler 使用）
   └─ service/  业务逻辑：照片聚类
@@ -15,7 +15,7 @@ handler/       HTTP 层：路由、鉴权、请求校验、响应序列化
             └─ db/ · config/ · apperr/ · geo/
 middleware/    与业务无关的横切关注点，只依赖 gin
 storage/ session/ geocode/   平级的服务包，互不依赖
-`F`
+```
 
 **依赖是单向的**：下层不允许引用上层。判断方法很简单——
 一个包如果 import 了 `handler` 或 `dto`，那它放错层了。

@@ -14,7 +14,7 @@
 
 ## 快速开始
 
-`F`powershell
+```powershell
 # 1. 依赖容器（Postgres / Redis / MinIO）
 powershell -ExecutionPolicy Bypass -File ..\scripts\dev-up.ps1
 
@@ -30,7 +30,7 @@ go run ./cmd/server
 
 # 或编译成单文件再跑
 go build -o bin/server.exe ./cmd/server; .\bin\server.exe
-`F`
+```
 
 - 存活探针：<http://127.0.0.1:8000/healthz>
 - 就绪探针：<http://127.0.0.1:8000/healthz/ready>（检查 Postgres / Redis / 对象存储）
@@ -46,7 +46,7 @@ go build -o bin/server.exe ./cmd/server; .\bin\server.exe
 
 每一级目录都有独立的 README，上层讲整体与约定，下层讲具体文件。
 
-`F`
+```
 api/
 ├── cmd/server/            进程入口：装配依赖、启动 HTTP、优雅关闭
 ├── internal/              全部实现（internal 保证不被外部模块导入）
@@ -63,7 +63,7 @@ api/
 │   ├── middleware/        CORS 与 CSRF
 │   └── handler/           HTTP 层：路由、鉴权、各资源处理器
 └── go.mod / go.sum
-`F`
+```
 
 ### 子目录索引
 
@@ -88,13 +88,13 @@ api/
 
 ## 分层与依赖方向
 
-`F`
+```
 cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 -> 路由
   └─ handler          HTTP 层（依赖下面全部）
        └─ service     业务逻辑（聚类）
             └─ model  数据模型
                  └─ db / config / apperr / geo
-`F`
+```
 
 依赖是单向的：`handler` 可以引用下层，下层**不允许**反过来引用 `handler`。
 `dto` 只被 `handler` 使用；`storage` / `session` / `geocode` 是平级的服务包，互相独立。
@@ -121,7 +121,7 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 
 ## 请求生命周期
 
-`F`
+```
 请求
  └─ gin.Recovery            panic 兜底
      └─ RequestLogger       slog 访问日志
@@ -129,16 +129,16 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
              └─ CSRF        变更类请求必须带 X-Requested-With
                  └─ 路由 + currentUser   解析 Cookie -> 查会话 -> 载入用户
                      └─ handler          解析/校验 -> 调用服务 -> 序列化响应
-`F`
+```
 
 中间件按 `r.Use` 的注册顺序执行，所以 **CORS 必须注册在 CSRF 之前**——
 否则跨站请求会先撞上 CSRF 校验，而不是在预检阶段就被拒绝。
 
 **错误契约**：任何失败都返回同一形状，前端只需处理一种结构。
 
-`F`json
+```json
 { "code": "photo_not_found", "message": "照片不存在", "detail": {} }
-`F`
+```
 
 ---
 
@@ -166,7 +166,7 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 
 ## 路由总表
 
-`F`
+```
 GET    /healthz                         存活探针
 GET    /healthz/ready                   就绪探针（DB / Redis / 对象存储）
 
@@ -197,7 +197,7 @@ DELETE /api/v1/notes/:note_id           删除笔记
 
 GET    /api/v1/geo/reverse?lat=&lng=    经纬度 -> 地名
 GET    /api/v1/geo/search?q=            地名搜索
-`F`
+```
 
 ---
 

@@ -9,13 +9,13 @@
 
 表结构与 Python 版**完全一致**，可以直接对接同一个数据库。
 
-`F`
+```
 User ─┬─< Place ─┬─< Photo
       │          └─< Note
       ├─< Trip ──< TripPlace >── Place      （行程串联，界面待启用）
       ├─< Share                             （公开分享，界面待启用）
       └─< UserSession                       （仅 SESSION_BACKEND=db 时使用）
-`F`
+```
 
 ## 三条约定
 

@@ -8,9 +8,9 @@
 
 任何失败都归一成同一形状，前端只需处理一种结构：
 
-`F`json
+```json
 { "code": "photo_not_found", "message": "照片不存在", "detail": {} }
-`F`
+```
 
 | 构造器 | HTTP 状态 |
 |---|---|

@@ -9,7 +9,7 @@
 `main()` 只做一件事：调用 `run()` 并在失败时以非零码退出。
 真正的装配都在 `run()` 里，顺序即依赖顺序：
 
-`F`
+```
 config.Load()            读环境变量（含连接串归一化）
   -> db.Connect()        连接池 + Ping
   -> db.Migrate()        GORM AutoMigrate（只增不删，可重复执行）
@@ -18,7 +18,7 @@ config.Load()            读环境变量（含连接串归一化）
   -> session.NewRedisStore / NewDBStore   按 SESSION_BACKEND 选择
   -> handler.New()       注入全部依赖
   -> http.Server{Handler: h.Router()}
-`F`
+```
 
 ## 几个刻意的决定
 

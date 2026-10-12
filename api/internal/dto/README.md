@@ -15,12 +15,12 @@
 
 ## 校验写在结构体标签上
 
-`F`go
+```go
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email,max=320"`
 	Password string `json:"password" binding:"required,min=8,max=200"`
 }
-`F`
+```
 
 由 Gin 内置的 validator 执行，失败时 `handler.bind()` 统一转成 422。
 **不要在处理器里手写 if 校验**——那样错误码与消息格式会各写各的。

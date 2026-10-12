@@ -19,13 +19,13 @@
 本机有 Go 工具链就够。**产物完全等价**——同为静态 Linux amd64 二进制、同一个 alpine 运行时、
 同样以 UID 10001 非 root 运行。
 
-`F`powershell
+```powershell
 # 标准路径
 podman build -f deploy/containerfiles/Containerfile.api -t travel-blog-api:dev .
 
 # 本地快速路径（需先 scripts/k8s-build.ps1 生成 api/bin/server-linux）
 podman build -f deploy/containerfiles/Containerfile.api.local -t travel-blog-api:dev .
-`F`
+```
 
 两者都内置了 `CGO_ENABLED=0` / `-trimpath` / `-ldflags "-s -w"`，成品约 86 MB。
 

@@ -20,12 +20,12 @@
 
 ## 中间件顺序至关重要
 
-`F`go
+```go
 r.Use(gin.Recovery())
 r.Use(RequestLogger())
 r.Use(middleware.CORS(...))   // 必须在前
 r.Use(middleware.CSRF(...))
-`F`
+```
 
 `r.Use` 按注册顺序执行。**CORS 必须在 CSRF 之前**，否则跨站请求会先撞上 CSRF 校验
 （返回 403），而不是在预检阶段就被干净地拒绝——虽然结果都是拒绝，
