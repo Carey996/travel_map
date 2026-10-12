@@ -63,7 +63,8 @@ function switchLang(value: string | number | boolean | undefined): void {
   <div class="login-page">
     <el-card class="login-card" shadow="always">
       <div class="login-head">
-        <div>
+        <span class="brand-icon login-logo">🗺</span>
+        <div class="login-heading">
           <h1>{{ t('app.title') }}</h1>
           <p class="muted">{{ t('app.subtitle') }}</p>
         </div>
@@ -97,11 +98,19 @@ function switchLang(value: string | number | boolean | undefined): void {
         @submit.prevent="submit"
       >
         <el-form-item :label="t('auth.email')" prop="email">
-          <el-input v-model="form.email" type="email" autocomplete="email" />
+          <el-input v-model="form.email" type="email" autocomplete="email" size="large">
+            <template #prefix>
+              <el-icon><Message /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item v-if="mode === 'register'" :label="t('auth.displayName')" prop="displayName">
-          <el-input v-model="form.displayName" />
+          <el-input v-model="form.displayName" size="large">
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item :label="t('auth.password')" prop="password">
@@ -109,14 +118,20 @@ function switchLang(value: string | number | boolean | undefined): void {
             v-model="form.password"
             type="password"
             show-password
+            size="large"
             :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
-          />
+          >
+            <template #prefix>
+              <el-icon><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-button
           type="primary"
           native-type="submit"
           class="submit"
+          size="large"
           :loading="auth.submitting"
         >
           {{ mode === 'login' ? t('auth.signIn') : t('auth.signUp') }}
@@ -127,12 +142,33 @@ function switchLang(value: string | number | boolean | undefined): void {
 </template>
 
 <style scoped>
+.login-head {
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.login-logo {
+  width: 38px;
+  height: 38px;
+  font-size: 19px;
+  border-radius: 11px;
+}
+
+.login-heading {
+  flex: 1;
+  min-width: 0;
+}
+
 .mode-switch {
+  display: flex;
   width: 100%;
   margin-bottom: 18px;
 }
 
-.mode-switch :deep(.el-radio-button),
+.mode-switch :deep(.el-radio-button) {
+  flex: 1;
+}
+
 .mode-switch :deep(.el-radio-button__inner) {
   width: 100%;
 }
@@ -143,5 +179,6 @@ function switchLang(value: string | number | boolean | undefined): void {
 
 .submit {
   width: 100%;
+  margin-top: 4px;
 }
 </style>

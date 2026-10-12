@@ -14,7 +14,7 @@
   },
   "tabs": { "places": "Places", "timeline": "Timeline", "unplaced": "Unplaced" },
   "map": {
-    "searchPlaceholder": "Search a city or place…", "newPlace": "＋ New place",
+    "searchPlaceholder": "Search a city or place…", "newPlace": "New place",
     "clickToPlace": "Click the map", "placeModeHint": "Click a spot on the map to create a place",
     "layers": "Base map", "dots": "Photo dots", "showPhotoDots": "Show individual photos when zoomed in",
     "fitAll": "Fit all", "pickPointForPhotos": "Click the map where these photos were taken",
@@ -32,6 +32,7 @@
     "rating": "Rating", "summary": "Summary", "summaryPlaceholder": "Write something… (Markdown supported)",
     "summaryEmpty": "No summary yet", "addTag": "Add a tag and press Enter", "photos": "Photos",
     "noPhotos": "No photos in this place yet", "notes": "Travel notes", "empty": "No places yet",
+    "filterPlaceholder": "Filter places…", "count": "{n} places", "totalPhotos": "{n} photos",
     "photoCount": "{n} photos", "dangerZone": "Danger zone",
     "mergeInto": "Merge into another place…", "deleteKeepPhotos": "Delete place (keep photos)",
     "deleteWithPhotos": "Delete place and photos", "deleted": "Place deleted", "merged": "Merged",

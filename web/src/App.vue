@@ -216,8 +216,13 @@ function onSetPhotoLocation(): void {
           />
 
           <el-card v-if="!hasPlaces && !gallery.loading" class="map-hint" shadow="always">
+            <div class="hint-icon"><el-icon><MapLocation /></el-icon></div>
             <h3>{{ t('map.emptyTitle') }}</h3>
             <p class="muted">{{ t('map.emptyBody') }}</p>
+            <el-button type="primary" @click="fileInput?.click()">
+              <el-icon><UploadFilled /></el-icon>
+              <span>{{ t('upload.add') }}</span>
+            </el-button>
           </el-card>
         </main>
       </div>
@@ -246,8 +251,16 @@ function onSetPhotoLocation(): void {
     />
 
     <el-card v-if="batch" class="upload-float" shadow="always">
-      <p class="muted">{{ t('upload.uploading', { done: batch.done, total: batch.total }) }}</p>
-      <el-progress :percentage="batch.total ? Math.round((batch.done / batch.total) * 100) : 0" />
+      <div class="upload-float-head">
+        <el-icon class="upload-float-icon"><Loading /></el-icon>
+        <span>{{ t('upload.uploading', { done: batch.done, total: batch.total }) }}</span>
+      </div>
+      <el-progress
+        :percentage="batch.total ? Math.round((batch.done / batch.total) * 100) : 0"
+        :stroke-width="8"
+        striped
+        striped-flow
+      />
     </el-card>
 
     <div v-if="dragging" class="drop-mask">{{ t('upload.dropHere') }}</div>

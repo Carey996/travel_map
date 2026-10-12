@@ -9,12 +9,29 @@
 | 组件 | 职责 | 主要 Element Plus 组件 |
 |---|---|---|
 | `LoginView.vue` | 登录 / 注册，带表单校验 | `el-card`, `el-form`, `el-alert` |
-| `TopBar.vue` | 地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`, `el-select`, `el-checkbox`, `el-radio-group`, `el-dropdown` |
-| `PlaceSidebar.vue` | 地点列表 / 时间线 / 未定位三个视图 | `el-tabs`, `el-scrollbar`, `el-badge`, `el-image`, `el-skeleton`, `el-empty` |
+| `TopBar.vue` | 地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`, `el-select`, `el-checkbox`, `el-radio-group`, `el-tooltip`, `el-avatar`, `el-dropdown` |
+| `PlaceSidebar.vue` | 地点列表（含本地筛选）/ 时间线 / 未定位三个视图 | `el-radio-group`（分段切换）, `el-input`（筛选）, `el-scrollbar`, `el-image`, `el-skeleton`, `el-empty` |
 | `MapCanvas.vue` | Leaflet 地图：聚合大头针、照片点、坐标纠偏、相机控制 | 无（Leaflet 直接使用） |
 | `PlaceDrawer.vue` | 地点详情：改名、分类、评分、标签、Markdown、照片、笔记、合并与删除 | `el-drawer`, `el-input`, `el-select`, `el-rate`, `el-tag`, `el-date-picker`, `el-collapse`, `ElMessageBox` |
 | `PhotoLightbox.vue` | 大图查看、EXIF 信息、说明编辑、定位与删除 | `el-dialog`, `el-image`, `el-descriptions` |
 | `PhotoUploader.vue` | 上传入口，Element Plus 负责 UI，编排交给 `lib/upload.ts` | `el-upload`（自定义 `http-request`） |
+
+## 排版约定
+
+视觉上有几条固定约定，改样式前先看一眼：
+
+| 约定 | 位置 |
+|---|---|
+| 顶栏是**单行** 58px 工具条（`--tb-topbar-h`）：左边品牌 + 固定宽搜索 + 主操作，右边工具组不压缩不换行 | `TopBar.vue` |
+| 侧栏固定 336px（`--tb-sidebar-w`）：上部是分段切换 + 筛选，下部独立滚动 | `PlaceSidebar.vue` |
+| 圆角、阴影、间距统一取 `--tb-*` 变量，组件里不写死数值 | `styles/base.css` |
+| 地点抽屉：封面压暗 + 标题浮在图上，正文按 `section-head`（图标 + 标题 + 计数 + 操作）分区 | `PlaceDrawer.vue` |
+| 灯箱：宽屏左右分栏（图 / 信息），窄屏自动堆叠 | `PhotoLightbox.vue` |
+
+**一个 Element Plus 的坑**：`el-tooltip`、`el-autocomplete` 这类组件的根节点会被内部包装
+元素替换掉，`<style scoped>` 的 `data-v-*` 属性**传不到它身上**——写成 `.my-class { width: … }`
+的规则会静默失效（顶栏搜索框就踩过：宽度一直没生效，输入框撑满整行）。
+解法是 `.父级 :deep(.my-class)`，或者像搜索框那样自己套一层原生 `div`。
 
 ## 组合关系
 

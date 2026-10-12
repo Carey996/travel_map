@@ -14,7 +14,7 @@
   },
   "tabs": { "places": "地点", "timeline": "时间线", "unplaced": "未定位" },
   "map": {
-    "searchPlaceholder": "搜索城市或地点…", "newPlace": "＋ 新建地点",
+    "searchPlaceholder": "搜索城市或地点…", "newPlace": "新建地点",
     "clickToPlace": "点地图选位置", "placeModeHint": "点击地图上的位置来新建一个地点",
     "layers": "底图", "dots": "照片点", "showPhotoDots": "在高缩放级别显示单张照片的位置",
     "fitAll": "全览", "pickPointForPhotos": "请在地图上点击照片所在的位置",
@@ -32,6 +32,7 @@
     "rating": "评分", "summary": "笔记摘要", "summaryPlaceholder": "写点什么…（支持 Markdown）",
     "summaryEmpty": "还没有摘要", "addTag": "添加标签后回车", "photos": "照片",
     "noPhotos": "这个地点还没有照片", "notes": "旅行笔记", "empty": "还没有地点",
+    "filterPlaceholder": "筛选地点…", "count": "{n} 个地点", "totalPhotos": "{n} 张照片",
     "photoCount": "{n} 张照片", "dangerZone": "危险操作",
     "mergeInto": "合并到其他地点…", "deleteKeepPhotos": "删除地点（保留照片）",
     "deleteWithPhotos": "删除地点及照片", "deleted": "地点已删除", "merged": "已合并",
