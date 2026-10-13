@@ -18,7 +18,8 @@
     "clickToPlace": "Click the map", "placeModeHint": "Click a spot on the map to create a place",
     "layers": "Base map", "dots": "Photo dots", "showPhotoDots": "Show individual photos when zoomed in",
     "fitAll": "Fit all", "pickPointForPhotos": "Click the map where these photos were taken",
-    "emptyTitle": "No places yet", "emptyBody": "Upload photos with GPS and places appear automatically, or click the map to create one."
+    "emptyTitle": "No places yet", "emptyBody": "Upload photos with GPS and places appear automatically, or click the map to create one.",
+    "outsideCoverage": "Amap tiles cover mainland China only — no tiles here"
   },
   "upload": {
     "add": "Upload photos", "dropHere": "Drop to upload", "uploading": "Uploading {done}/{total}",

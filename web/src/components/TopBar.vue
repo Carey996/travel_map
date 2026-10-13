@@ -7,7 +7,7 @@ import { ElMessage } from 'element-plus';
 import { api, type GeoSearchItem } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { useGalleryStore } from '@/stores/gallery';
-import { TILE_PROVIDERS } from '@/lib/tiles';
+import { AVAILABLE_TILE_PROVIDERS } from '@/lib/tiles';
 import { setLang, SUPPORTED_LANGS, type Lang } from '@/i18n';
 import PhotoUploader from './PhotoUploader.vue';
 
@@ -134,10 +134,10 @@ async function onLogout(): Promise<void> {
         </el-button>
       </el-tooltip>
 
-      <el-tooltip :content="t('map.layers')" placement="bottom">
+      <el-tooltip v-if="AVAILABLE_TILE_PROVIDERS.length > 1" :content="t('map.layers')" placement="bottom">
         <el-select v-model="tileProviderId" class="tb-layers">
           <el-option
-            v-for="provider in TILE_PROVIDERS"
+            v-for="provider in AVAILABLE_TILE_PROVIDERS"
             :key="provider.id"
             :value="provider.id"
             :label="locale === 'zh' ? provider.labelZh : provider.labelEn"

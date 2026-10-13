@@ -13,7 +13,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import type { Photo, Place } from '@/api/client';
-import { fromMapCoords, toMapCoords } from '@/lib/coords';
+import { fromMapCoords, outOfChina, toMapCoords } from '@/lib/coords';
 import { findProvider } from '@/lib/tiles';
 
 export type MapFocus = { lat: number; lng: number; zoom?: number; token: number };
@@ -51,6 +51,15 @@ let photoLayer: L.LayerGroup | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
 const provider = computed(() => findProvider(props.tileProviderId));
+
+/** 底图只覆盖中国大陆时（高德），视图跑到境外就浮一条说明，免得看到一片空白以为坏了 */
+const outsideCoverage = ref(false);
+
+function updateCoverage(): void {
+  if (!map) return;
+  const center = map.getCenter();
+  outsideCoverage.value = provider.value.crs === 'GCJ02' && outOfChina(center.lat, center.lng);
+}
 
 function escapeHtml(input: string): string {
   return input
@@ -104,7 +113,7 @@ function renderTile(): void {
   const current = provider.value;
   tileLayer = L.tileLayer(current.url, {
     maxZoom: current.maxZoom,
-    minZoom: 2,
+    minZoom: current.minZoom,
     subdomains: current.subdomains.length ? current.subdomains : 'abc',
     attribution: current.attribution,
     // 刻意不设 crossOrigin：不需要读取瓦片像素，
@@ -180,13 +189,16 @@ onMounted(() => {
     // 缩放级别只用于决定要不要显示单张照片点，因此留在组件内部，
     // 不向上层抛事件——缩放是高频事件，回写选中状态会把刚打开的面板立刻关掉
     zoomLevel.value = map ? map.getZoom() : zoomLevel.value;
+    updateCoverage();
   });
+  map.on('moveend', updateCoverage);
 
   resizeObserver = new ResizeObserver(() => map?.invalidateSize());
   resizeObserver.observe(container.value);
 
   renderTile();
   renderPlaces();
+  updateCoverage();
 });
 
 onBeforeUnmount(() => {
@@ -212,6 +224,7 @@ watch(provider, () => {
   renderTile();
   renderPlaces();
   renderPhotoDots();
+  updateCoverage();
 });
 watch([() => props.showPhotoDots, zoomLevel], renderPhotoDots);
 
@@ -238,12 +251,44 @@ watch(
 </script>
 
 <template>
-  <div ref="container" class="map-canvas" :class="{ 'is-placing': props.placingMode }" />
+  <div class="map-shell">
+    <div ref="container" class="map-canvas" :class="{ 'is-placing': props.placingMode }" />
+
+    <div v-if="outsideCoverage" class="map-notice">
+      <el-icon><Warning /></el-icon>
+      <span>{{ t('map.outsideCoverage') }}</span>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.map-shell {
+  position: absolute;
+  inset: 0;
+}
+
 .map-canvas {
   position: absolute;
   inset: 0;
+}
+
+.map-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 700;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: var(--tb-shadow-1);
+  color: var(--el-text-color-regular);
+  font-size: 12.5px;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
 }
 </style>

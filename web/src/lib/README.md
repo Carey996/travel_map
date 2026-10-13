@@ -13,7 +13,7 @@
 | 文件 | 职责 | 关键导出 |
 |---|---|---|
 | `coords.ts` | WGS-84 与 GCJ-02 坐标纠偏 | `outOfChina`, `wgs84ToGcj02`, `gcj02ToWgs84`, `toMapCoords`, `fromMapCoords` |
-| `tiles.ts` | 底图源定义（含坐标系标记与实测结论） | `TILE_PROVIDERS`, `DEFAULT_TILE_PROVIDER`, `findProvider` |
+| `tiles.ts` | 底图源定义（含坐标系标记与实测结论）；**当前只启用高德** | `TILE_PROVIDERS`, `ENABLED_TILE_PROVIDER_IDS`, `AVAILABLE_TILE_PROVIDERS`, `DEFAULT_TILE_PROVIDER`, `findProvider` |
 | `exif.ts` | 浏览器端 EXIF 解析、Canvas 缩略图生成、sha256 | `readExif`, `deriveImages`, `sha256Hex` |
 | `upload.ts` | 单张照片的上传编排与带并发上限的批量上传 | `uploadPhotoFile`, `uploadMany`, `UploadOutcome` |
 | `markdown.ts` | 极简 Markdown 渲染（先整体转义，再做有限替换） | `renderMarkdown` |
@@ -32,6 +32,9 @@
 - 转换依据是底图源定义里的 `crs` 字段
 
 `gcj02ToWgs84` 用迭代反解而非简单做差，精度更好。
+
+**当前底图是高德（GCJ-02），这条链路每次渲染都会真的走到**——少调一次 `toMapCoords()`，
+大头针就会偏移 100~600 米，而且在低缩放下根本看不出来。
 
 ## 上传编排的五步
 
