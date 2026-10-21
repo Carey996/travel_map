@@ -8,6 +8,11 @@ data:
   ENVIRONMENT: "prod"
   APP_VERSION: "0.3.0"
 
+  # API 与 web 分属两个 Pod，不共享网络命名空间：
+  # 默认只监听回环（127.0.0.1），Service 转进来和 kubelet 的就绪探针都会 connection refused。
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+
   # 会话存 Redis；会话本身是临时数据，因此 Redis 用 Deployment 即可，无需持久化
   SESSION_BACKEND: "redis"
   SESSION_COOKIE_NAME: "tb_session"

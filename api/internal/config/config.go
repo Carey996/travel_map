@@ -20,7 +20,11 @@ type Config struct {
 	AppName     string
 	AppVersion  string
 	Environment string
-	APIPort     int
+	// APIHost 是监听地址。默认 127.0.0.1——本地开发和单 Pod 验证都靠它最安全。
+	// 但容器化部署时 API 与 web 分属两个网络命名空间，必须监听到 0.0.0.0，
+	// 否则 web 的 nginx 反代只会拿到 connection refused（K8s 的就绪探针同理）。
+	APIHost string
+	APIPort int
 
 	DatabaseURL string
 	// MigrateOnStart 控制进程启动时是否执行结构迁移。
@@ -45,7 +49,11 @@ type Config struct {
 	S3SecretKey      string
 	S3Bucket         string
 	S3Region         string
+	// 两个 TLS 开关是分开的，因为「后端走内网明文、浏览器走公网 HTTPS」是最常见的部署形态，
+	// 而 minio-go 要求地址里的协议与 secure 开关严格一致（不一致直接报错、服务起不来）。
+	// S3UseSSL 管后端访问对象存储那条链路，S3PublicUseSSL 管签发出去的预签名 URL。
 	S3UseSSL         bool
+	S3PublicUseSSL   bool
 	S3PresignExpires time.Duration
 
 	GeocodeProvider    string // photon | nominatim
@@ -81,10 +89,14 @@ func (c *Config) GeoBaseURL() string {
 func Load() (*Config, error) {
 	loadDotEnv()
 
+	// 不写 S3_PUBLIC_USE_SSL 时跟随 S3_USE_SSL：保持「内外同一个地址、同一种协议」的旧行为
+	s3UseSSL := envBool("S3_USE_SSL", false)
+
 	cfg := &Config{
 		AppName:     env("APP_NAME", "Travel Blog API"),
 		AppVersion:  env("APP_VERSION", "0.2.0"),
 		Environment: env("ENVIRONMENT", "dev"),
+		APIHost:     env("API_HOST", "127.0.0.1"),
 		APIPort:     envInt("API_PORT", 8000),
 
 		DatabaseURL:    env("DATABASE_URL", "postgres://travelblog:travelblog@localhost:5432/travelblog?sslmode=disable"),
@@ -108,7 +120,8 @@ func Load() (*Config, error) {
 		S3SecretKey:      env("S3_SECRET_KEY", "minioadmin"),
 		S3Bucket:         env("S3_BUCKET", "travelblog"),
 		S3Region:         env("S3_REGION", "us-east-1"),
-		S3UseSSL:         envBool("S3_USE_SSL", false),
+		S3UseSSL:         s3UseSSL,
+		S3PublicUseSSL:   envBool("S3_PUBLIC_USE_SSL", s3UseSSL),
 		S3PresignExpires: time.Duration(envInt("S3_PRESIGN_EXPIRES", 3600)) * time.Second,
 
 		GeocodeProvider:    env("GEOCODE_PROVIDER", "photon"),

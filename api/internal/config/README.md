@@ -27,6 +27,19 @@ Go 的 pgx 只认 `postgres://`。归一化后同一份 `.env` 在新旧两版�
 | `BrowserEndpoint()` | 浏览器直传用的对象存储地址（`S3_PUBLIC_ENDPOINT_URL` 为空时回落到 `S3_ENDPOINT_URL`） |
 | `GeoBaseURL()` | 当前地名服务的基地址（按 `GEOCODE_PROVIDER` 选择） |
 
+## 两对容易被忽略的开关
+
+**`API_HOST`（默认 `127.0.0.1`）。** 默认只监听回环——本地开发和 `podman play kube`
+的单 Pod 都靠它（Pod 内容器共享网络命名空间，回环就够）。但**容器化部署时 API 与 web
+不共享网络命名空间**，必须设成 `0.0.0.0`，否则 nginx 反代和 K8s 的就绪探针都会
+拿到 connection refused，症状是「容器 Up、页面 502」。
+
+**`S3_USE_SSL` 与 `S3_PUBLIC_USE_SSL`（后者默认跟随前者）。**
+minio-go 要求「地址里的协议」与「secure 开关」严格一致，不一致直接报错、进程起不来。
+而公网部署最常见的形态恰恰是两套协议：后端走容器内网 `http://minio:9000`，
+浏览器走对外 `https://img.example.com`。所以两个开关必须分开——
+一个开关表达不了这件事。
+
 ## 约定
 
 **业务代码不要直接读 `os.Getenv`**，一律走 `Config`。这样默认值、归一化、

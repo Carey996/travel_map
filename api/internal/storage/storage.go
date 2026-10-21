@@ -28,15 +28,18 @@ type Storage struct {
 
 // New 构造对象存储客户端。
 func New(cfg *config.Config) (*Storage, error) {
-	admin, err := newClient(cfg.S3Endpoint, cfg)
+	admin, err := newClient(cfg.S3Endpoint, cfg.S3UseSSL, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("构造对象存储客户端失败: %w", err)
+		return nil, fmt.Errorf("构造对象存储客户端失败（核对 S3_ENDPOINT_URL 里的协议与 S3_USE_SSL 是否一致）: %w", err)
 	}
 
 	presign := admin
 	if cfg.BrowserEndpoint() != cfg.S3Endpoint {
-		if presign, err = newClient(cfg.BrowserEndpoint(), cfg); err != nil {
-			return nil, fmt.Errorf("构造浏览器侧对象存储客户端失败: %w", err)
+		// 浏览器侧单独一个客户端：它只做本地签名，不发网络请求，
+		// 但「地址里的协议」与「secure 开关」由 S3_PUBLIC_USE_SSL 决定——
+		// 内网 http + 对外 https 的部署形态靠这两个开关表达。
+		if presign, err = newClient(cfg.BrowserEndpoint(), cfg.S3PublicUseSSL, cfg); err != nil {
+			return nil, fmt.Errorf("构造浏览器侧对象存储客户端失败（核对 S3_PUBLIC_ENDPOINT_URL 里的协议与 S3_PUBLIC_USE_SSL 是否一致）: %w", err)
 		}
 	}
 
@@ -48,10 +51,10 @@ func New(cfg *config.Config) (*Storage, error) {
 	}, nil
 }
 
-func newClient(endpoint string, cfg *config.Config) (*minio.Client, error) {
+func newClient(endpoint string, secure bool, cfg *config.Config) (*minio.Client, error) {
 	return minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
-		Secure: cfg.S3UseSSL,
+		Secure: secure,
 		Region: cfg.S3Region,
 	})
 }

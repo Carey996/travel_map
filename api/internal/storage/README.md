@@ -18,14 +18,19 @@
 
 ## 两个客户端
 
-| 客户端 | 地址 | 用途 |
-|---|---|---|
-| `admin` | `S3_ENDPOINT_URL` | 建桶、删除对象 |
-| `presign` | `BrowserEndpoint()` | 签发 URL |
+| 客户端 | 地址 | TLS 开关 | 用途 |
+|---|---|---|---|
+| `admin` | `S3_ENDPOINT_URL` | `S3_USE_SSL` | 建桶、删除对象 |
+| `presign` | `BrowserEndpoint()` | `S3_PUBLIC_USE_SSL` | 签发 URL |
 
 两者相同时复用同一个客户端。分开是因为部署到远端时，容器内网地址
 （如 `http://minio:9000`）与浏览器可达地址（如 `https://cdn.example.com`）
 往往不同——**签出来的 URL 里的主机名必须让浏览器能访问**。
+
+TLS 也必须是**两个**开关：minio-go 要求地址里的协议与 secure 开关严格一致，
+而「内网明文 + 对外 HTTPS」正是最常见的部署形态。只写 `S3_USE_SSL` 的话，
+两个客户端里必有一个协议对不上，`storage.New` 直接失败、进程起不来；
+包装后的报错会点名是哪个环境变量配错了。
 
 ## 关于 Content-Type
 

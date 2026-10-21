@@ -42,6 +42,10 @@ kubectl apply -k deploy/k8s/base
 服务不写任何文件，根文件系统可以完全只读。web 容器需要写的几个 nginx 目录
 用 emptyDir 顶上去。
 
+**API 显式监听 `0.0.0.0`（`configmap.yaml` 里的 `API_HOST`）。**
+进程默认只监听回环，本地单 Pod 靠共享网络命名空间能跑通，但集群里 API 与 web 分属两个 Pod，
+默认值会让 Service 与就绪探针都连不上。**这条别删。**
+
 **`preStop: sleep 5` 配合 `terminationGracePeriodSeconds: 30`。**
 滚动更新时先让 Endpoint 从 Service 摘除，再让进程退出；
 进程自身还会再等 10 秒处理完在途请求。

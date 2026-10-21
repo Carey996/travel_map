@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -103,7 +104,8 @@ func run() error {
 	// ---- HTTP ----
 	h := handler.New(cfg, gdb, rdb, sessions, store, geocode.New(cfg))
 	srv := &http.Server{
-		Addr:              "127.0.0.1:" + strconv.Itoa(cfg.APIPort),
+		// 默认只监听回环（本地开发、单 Pod 验证）；容器化部署时用 API_HOST=0.0.0.0
+		Addr:              net.JoinHostPort(cfg.APIHost, strconv.Itoa(cfg.APIPort)),
 		Handler:           h.Router(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
