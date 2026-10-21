@@ -1,0 +1,161 @@
+# 单机 Docker Compose 编排 —— 一台最便宜的云主机就能跑起整套服务。
+#
+# 在**本目录**（deploy/compose/）执行：
+#   cp .env.example .env        # 填域名与密码
+#   docker compose up -d --build
+#
+# 为什么强调「在本目录」：.env 就放在 compose 文件旁边，build 的上下文
+# 指向仓库根目录（../..），所以 `.env` 的加载位置不用去猜 compose 的版本差异。
+#
+# 与 deploy/k8s/ 的关系：同一份镜像、同一套环境变量，差异只在编排方式。
+# 这里把 Postgres / Redis / MinIO 也放进编排，因此只适合单机；
+# 换成托管数据库或云对象存储时，删掉对应 service、改几个环境变量即可。
+#
+# 安全边界：只有 Caddy 对外发布 80/443。数据库、Redis、MinIO、API、nginx
+# 都只挂在 Docker 内部网络上，宿主机端口一概不映射。
+
+name: travel-blog
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: travelblog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?在 .env 里设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: travelblog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travelblog -d travelblog"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 会话是临时数据：刻意不落盘，丢了重新登录即可（与 deploy/k8s/base 的决定一致）
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?在 .env 里设置 S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?在 .env 里设置 S3_SECRET_KEY}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      # MinIO 镜像里自带 curl（已实测），用它探活最省事
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      # 构建上下文是仓库根目录：镜像定义要从 web/ 与 deploy/ 各取文件
+      context: ../..
+      dockerfile: deploy/containerfiles/Containerfile.api
+    image: travel-blog-api:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: prod
+      # 容器内必须监听所有网卡：web 的 nginx 在另一个容器里，
+      # 只监听回环（默认值）会让反代拿到 connection refused
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+
+      DATABASE_URL: "postgres://travelblog:${POSTGRES_PASSWORD}@postgres:5432/travelblog?sslmode=disable"
+      REDIS_URL: "redis://redis:6379/0"
+      SESSION_BACKEND: redis
+      SESSION_COOKIE_NAME: tb_session
+      SESSION_TTL_SECONDS: "2592000"
+
+      # 走 HTTPS，Cookie 必须带 Secure
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: lax
+      # 前端与 API 同源（Caddy 只对外暴露一个站点域名），白名单列它即可
+      CORS_ORIGINS: "https://${SITE_DOMAIN}"
+
+      # 后端走容器内网的明文地址；浏览器走对外 HTTPS 地址。
+      # 这两个开关必须分别与各自地址里的协议一致，否则 minio-go 会直接报错、服务起不来。
+      S3_ENDPOINT_URL: "http://minio:9000"
+      S3_USE_SSL: "false"
+      S3_PUBLIC_ENDPOINT_URL: "https://${MINIO_DOMAIN}"
+      S3_PUBLIC_USE_SSL: "true"
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: travelblog
+      S3_REGION: us-east-1
+      S3_PRESIGN_EXPIRES: "3600"
+
+      # 单副本，启动时自己迁移即可；扩到多副本要改成 false 并单独跑一次 -migrate-only
+      MIGRATE_ON_START: "true"
+      GEOCODE_PROVIDER: photon
+      PHOTON_BASE_URL: https://photon.komoot.io
+    # 服务本身不写任何文件——「无状态」换来的直接好处
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # 存活探针不碰依赖；就绪探针才是 /healthz/ready
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/containerfiles/Containerfile.web
+    image: travel-blog-web:latest
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # 同网络内容器名就是域名：nginx 把 /api、/healthz 反代到这里
+      API_UPSTREAM: api:8000
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - minio
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?在 .env 里设置 SITE_DOMAIN}
+      MINIO_DOMAIN: ${MINIO_DOMAIN:?在 .env 里设置 MINIO_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 证书必须持久化，否则每次重建容器都要重新申请，会撞上 Let's Encrypt 的频率限制
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  miniodata:
+  caddy_data:
+  caddy_config:

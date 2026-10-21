@@ -254,9 +254,26 @@ travel_blog/
 
 ---
 
+## 用一台云主机部署（成本最低）
+
+不需要集群：一台 **2C2G 的轻量应用服务器 + 两个域名**，六个服务（Postgres / Redis / MinIO /
+API / nginx / Caddy）用 Docker Compose 跑在同一台机器上，HTTPS 由 Caddy 自动申请。
+**月成本约 ¥40 以内**，香港地域还免 ICP 备案。
+
+```bash
+cd deploy/compose
+cp .env.example .env          # 填 SITE_DOMAIN / MINIO_DOMAIN / 两个密码
+docker compose up -d --build
+```
+
+选哪家云、装多大、备案与备份怎么算、哪三个坑必须知道，见
+[`deploy/compose/README.md`](deploy/compose/README.md)。
+
+---
+
 ## 用 Kubernetes 部署
 
-两套编排，**同一份镜像**：
+集群这边有两套编排，**同一份镜像**：
 
 ```bash
 # 1. 构建镜像

@@ -1,0 +1,25 @@
+# Caddy 反向代理 + 自动 HTTPS（Let's Encrypt / ZeroSSL）。
+#
+# 两个域名都靠环境变量注入，由 docker-compose.yml 传入：
+#   SITE_DOMAIN   站点本身（web 的 nginx 已经把 /api 与 /healthz 反代到 API）
+#   MINIO_DOMAIN  对象存储。必须浏览器可达——图片是拿预签名 URL 直传/直取的。
+#
+# ⚠️ 为什么把 Host 头显式透传：预签名 URL 的签名包含 Host 头，
+# 一旦上游看到的 Host 与签名时的不一致，MinIO 会返回 403、图片全部加载失败。
+# nginx 的 proxy_set_header 不会做这件事（它默认改写 Host），Caddy 也显式写死更稳。
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+{$MINIO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy minio:9000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}

@@ -2,11 +2,12 @@
 
 > 知识树：[项目根](../README.md) › **`deploy`**
 
-把两个应用打包成容器、并用 Kubernetes 清单拉起的全部材料。
+把两个应用打包成容器、并用一份编排拉起的全部材料。
 **不含任何业务代码。**
 
 ```
 deploy/
+├── compose/          单机 Docker Compose（六件套 + Caddy 自动 HTTPS），成本最低
 ├── containerfiles/   容器镜像定义（后端 / 前端）
 ├── nginx/            前端容器的 nginx 配置模板（含 /api 反代）
 └── k8s/
@@ -14,16 +15,20 @@ deploy/
     └── local/        单 Pod 版本，用 podman 直接跑起来验证
 ```
 
-## 两种拉起方式
+## 三种拉起方式
 
 | 方式 | 命令 | 适用 |
 |---|---|---|
+| **单机 Compose** | `cd deploy/compose && docker compose up -d --build` | 一台云主机、最低成本、单副本 |
 | **Kubernetes** | `kubectl apply -k deploy/k8s/base`（迁移 Job 先跑） | 生产 / 集群 |
 | **本地单 Pod** | `podman play kube deploy/k8s/local/pod.yaml` | 开发机验证，不需要集群 |
 
-两条路径**用的是同一份镜像**，差异只在编排方式。
+三条路径**用的是同一份镜像**，差异只在编排方式。
 本地单 Pod 的存在意义是：让清单里用到的镜像、环境变量、探针真的被跑过一遍，
 而不是交出一堆没验证过的 YAML。
+
+单机那套把 Postgres / Redis / MinIO 也放进了编排，因此那份 `docker-compose.yml`
+只在单机成立；换成托管数据库或云对象存储时删掉对应 service 即可。详见 [`compose/`](compose/README.md)。
 
 ## 快速开始
 
@@ -33,6 +38,10 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
   go build -C api -trimpath -ldflags '-s -w' -o bin/server-linux ./cmd/server
 podman build -f deploy/containerfiles/Containerfile.api.local -t localhost/travel-blog-api:dev .
 podman build -f deploy/containerfiles/Containerfile.web       -t localhost/travel-blog-web:dev .
+
+# 1B. 单机部署：不用本地构建，服务器上一条命令（Compose 里用的是多阶段 Containerfile.api）
+#     .env 要放在 compose 文件旁边，所以进那个目录跑；用子 shell 以免影响下面的命令
+(cd deploy/compose && cp .env.example .env && docker compose up -d --build)   # -> https://SITE_DOMAIN
 
 # 2A. 本地跑（不需要集群）
 #     ⚠️ 先停掉「快速开始」那套开发容器：Pod 里的 minio 也要绑 9000
@@ -69,6 +78,7 @@ podman play kube --down deploy/k8s/local/pod.yaml
 
 | 目录 | 一句话 |
 |---|---|
+| [`compose/`](compose/README.md) | 单机编排：六件套、Caddy 自动 HTTPS、成本账与备份 |
 | [`containerfiles/`](containerfiles/README.md) | 后端与前端的镜像定义（含本地快速路径） |
 | [`nginx/`](nginx/README.md) | nginx 配置模板：SPA 路由 + API 反代 + 缓存策略 |
 | [`k8s/`](k8s/README.md) | 清单总览与两种编排方式的关系 |
