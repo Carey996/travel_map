@@ -14,10 +14,22 @@
 |---|---|---|
 | `coords.ts` | WGS-84 与 GCJ-02 坐标纠偏 | `outOfChina`, `wgs84ToGcj02`, `gcj02ToWgs84`, `toMapCoords`, `fromMapCoords` |
 | `tiles.ts` | 底图源定义（含坐标系标记与实测结论）；**当前只启用高德** | `TILE_PROVIDERS`, `ENABLED_TILE_PROVIDER_IDS`, `AVAILABLE_TILE_PROVIDERS`, `DEFAULT_TILE_PROVIDER`, `findProvider` |
-| `exif.ts` | 浏览器端 EXIF 解析、Canvas 缩略图生成、sha256 | `readExif`, `deriveImages`, `sha256Hex` |
+| `exif.ts` | 浏览器端 EXIF 解析、Canvas 缩略图生成、内容哈希 | `readExif`, `deriveImages`, `sha256Hex` |
+| `sha256.ts` | 纯 JS 的 SHA-256；`crypto.subtle` 不可用时兜底 | `sha256Bytes`, `toHex` |
 | `upload.ts` | 单张照片的上传编排与带并发上限的批量上传 | `uploadPhotoFile`, `uploadMany`, `UploadOutcome` |
 | `markdown.ts` | 极简 Markdown 渲染（先整体转义，再做有限替换） | `renderMarkdown` |
 | `format.ts` | 日期、体积、坐标等展示格式化 | `formatDate`, `formatDateTime`, `formatDayLabel`, `formatBytes`, `formatCoords` |
+
+## 一个只在「临时用 IP 部署」时才会炸的点
+
+`sha256Hex` 原本直接调 `crypto.subtle.digest`。但 **`crypto.subtle` 只在安全上下文
+（HTTPS 或 localhost）里存在**——用 `http://<公网 IP>` 打开页面时它是 `undefined`，
+上传第一张照片就会抛 `Cannot read properties of undefined (reading 'digest')`。
+
+所以现在写成「有 WebCrypto 就用原生，没有就退回 `sha256.ts` 的纯 JS 实现」。
+两者输出逐字节一致（已用补位边界、1 MiB / 3 MiB 随机数据与 Node 原生实现对比），
+5 MB 的照片用纯 JS 算一次约 16 ms。这个哈希只用于**上传幂等**，不是安全边界；
+上了 HTTPS 之后永远走原生实现。
 
 ## 最需要注意的一条：坐标
 

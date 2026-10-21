@@ -10,6 +10,7 @@
  */
 
 import exifr from 'exifr';
+import { sha256Bytes, toHex } from './sha256';
 
 export type PhotoExif = {
   lat: number | null;
@@ -196,10 +197,19 @@ export async function deriveImages(file: File): Promise<DerivedImages> {
   }
 }
 
+/**
+ * 计算内容哈希（十六进制）。
+ *
+ * 优先用 WebCrypto。但 `crypto.subtle` **只在安全上下文（HTTPS 或 localhost）里存在**：
+ * 用 `http://<公网 IP>` 打开页面时它是 `undefined`，直接点下去就会抛
+ * `Cannot read properties of undefined (reading 'digest')`——这正是「临时用 IP 部署」
+ * 时会撞上的坑。这个哈希只用于上传幂等，不是安全边界，所以没有 WebCrypto 时退回纯 JS。
+ */
 export async function sha256Hex(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer();
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    return toHex(new Uint8Array(await subtle.digest('SHA-256', buffer)));
+  }
+  return toHex(sha256Bytes(new Uint8Array(buffer)));
 }
