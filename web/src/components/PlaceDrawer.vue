@@ -146,6 +146,32 @@ async function onMerge(targetId: string): Promise<void> {
   await run(() => gallery.mergePlace(place.value!.id, targetId), t('place.merged'));
 }
 
+async function onTripChange(value: string): Promise<void> {
+  if (!place.value) return;
+  await run(() => gallery.setPlaceTrip(place.value!.id, value || null));
+}
+
+/** 以当前地点为起点新建一次旅行，并把它放进去 */
+async function createTripForPlace(): Promise<void> {
+  if (!place.value) return;
+  let title = '';
+  try {
+    const result = await ElMessageBox.prompt(t('trip.namePlaceholder'), t('trip.new'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
+      inputValue: place.value.name || '',
+      inputValidator: (value: string) => (value.trim() ? true : t('trip.needTitle')),
+    });
+    title = result.value.trim();
+  } catch {
+    return; // 用户取消
+  }
+  await run(async () => {
+    const trip = await gallery.createTrip({ title });
+    await gallery.setPlaceTrip(place.value!.id, trip.id);
+  }, t('trip.created'));
+}
+
 async function onGeocode(): Promise<void> {
   if (!place.value) return;
   await run(() => gallery.fillMissingNames());
@@ -235,6 +261,29 @@ async function onGeocode(): Promise<void> {
             <span class="dot">·</span>
             <span class="addr">{{ place.address }}</span>
           </template>
+        </div>
+
+        <div class="trip-row">
+          <el-icon><Flag /></el-icon>
+          <el-select
+            :model-value="place.trip_id ?? ''"
+            size="small"
+            class="trip-select"
+            :placeholder="t('trip.attach')"
+            @change="(value: string) => onTripChange(value)"
+          >
+            <el-option value="" :label="t('trip.none')" />
+            <el-option
+              v-for="trip in gallery.trips"
+              :key="trip.id"
+              :value="trip.id"
+              :label="trip.title || t('trip.untitled')"
+            />
+          </el-select>
+          <el-button text size="small" @click="createTripForPlace">
+            <el-icon><Plus /></el-icon>
+            <span>{{ t('trip.new') }}</span>
+          </el-button>
         </div>
 
         <div class="section-head">
@@ -538,6 +587,22 @@ async function onGeocode(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.trip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--tb-radius-sm);
+  background: var(--el-fill-color-lighter);
+  color: var(--el-text-color-secondary);
+}
+
+.trip-select {
+  flex: 1;
+  min-width: 0;
 }
 
 .summary-box {

@@ -64,6 +64,9 @@ README.md                              项目总览（本文件）
 - **自动聚类** —— 1.5 km 内的照片自动归入同一地点，超出则新建；地点自动继承照片的日期范围
 - **选点建点** —— 搜索城市（中文地名），或直接在地图上点选坐标新建地点
 - **旅行笔记** —— 每个地点可写多篇 Markdown 笔记，按天记录；地点本身还带摘要、评分、标签
+- **缩放归一** —— 地图缩小时自动按行政区划收敛：省（河南省）→ 市（洛阳市）→ 地点，
+  气泡上的数字是该组的照片数，点一下继续放大
+- **旅行框** —— 把多个地点归成一次旅行，地图上用同色虚线框圈起来并标注旅行名
 - **时间线视图** —— 全部照片按天分组浏览，灯箱支持键盘左右切换、逐张设置位置
 - **中英双语** —— 界面可实时切换
 - **多用户** —— 注册登录，会话走 HttpOnly Cookie + Redis
@@ -395,6 +398,13 @@ POST   /api/v1/notes                    写一篇笔记
 PATCH  /api/v1/notes/{id}               更新笔记
 DELETE /api/v1/notes/{id}               删除笔记
 
+GET    /api/v1/trips                    列出旅行（带地点数 / 照片数）
+POST   /api/v1/trips                    新建旅行
+PATCH  /api/v1/trips/{id}               改名 / 改摘要 / 改日期
+DELETE /api/v1/trips/{id}               删除旅行（地点保留）
+POST   /api/v1/trips/{id}/places        批量把地点加进旅行
+DELETE /api/v1/trips/{id}/places/{pid}  把某个地点移出旅行
+
 GET    /api/v1/geo/reverse?lat=&lng=    经纬度 -> 地名
 GET    /api/v1/geo/search?q=            地名搜索
 ```
@@ -434,7 +444,8 @@ GET    /api/v1/geo/search?q=            地名搜索
 - **浏览器无法解码 HEIC**（部分 iPhone 原图）——可上传、有定位，但缩略图要等后续加后端兜底
 - Element Plus 为全量引入，element-plus 分块约 354 KB（gzip）；需要瘦身可改按需引入，见 `web/README.md`
 - 上传是**逐张**登记的（每张需要自己的预签名 URL），超大相册会慢一些
-- 行程（把多个地点串成一次旅行）与公开只读分享页尚未实现，数据模型已预留（`trips` / `trip_places` / `shares` 表）
+- 公开只读分享页尚未实现（`shares` 表已预留）；旅行目前只有「地图上的框 + 侧栏列表」，
+  还没有行程详情页与顺序编排（`trip_places` 的 position / day_index 已经就位）
 
 ---
 

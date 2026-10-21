@@ -12,7 +12,14 @@
     "signUp": "创建账号", "signOut": "退出",
     "emailRequired": "请输入邮箱", "emailInvalid": "邮箱格式不正确", "passwordRequired": "请输入密码"
   },
-  "tabs": { "places": "地点", "timeline": "时间线", "unplaced": "未定位" },
+  "tabs": { "places": "地点", "trips": "旅行", "timeline": "时间线", "unplaced": "未定位" },
+  "trip": {
+    "untitled": "未命名旅行", "new": "新建旅行", "empty": "还没有旅行",
+    "namePlaceholder": "例如：2025 河南行", "attach": "所属旅行", "none": "不属于任何旅行",
+    "placeCount": "{n} 个地点", "photoCount": "{n} 张照片",
+    "confirmDelete": "删除「{name}」？地点本身会保留，只是不再属于这次旅行。",
+    "deleted": "旅行已删除", "created": "已加入新的旅行", "needTitle": "给这次旅行起个名字吧"
+  },
   "map": {
     "searchPlaceholder": "搜索城市或地点…", "newPlace": "新建地点",
     "clickToPlace": "点地图选位置", "placeModeHint": "点击地图上的位置来新建一个地点",

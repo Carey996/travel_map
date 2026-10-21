@@ -11,6 +11,7 @@
 | `place.go` | `PlaceCreate`, `PlaceUpdate`, `AssignPhotosRequest`, `MergePlaceRequest` | `PlaceOut`, `PlaceDetailOut` |
 | `photo.go` | `UploadURLRequest`, `UploadVariant`, `PhotoCreate`, `PhotoUpdate` | `SignedUpload`, `UploadURLResponse`, `PhotoOut` |
 | `note.go` | `NoteCreate`, `NoteUpdate` | `NoteOut` |
+| `trip.go` | `TripCreate`, `TripUpdate`, `TripPlacesRequest` | `TripOut`（带 place_count / photo_count） |
 | `date.go` | —— | `DateOnly` |
 
 ## 校验写在结构体标签上
@@ -33,6 +34,9 @@ type RegisterRequest struct {
 
 > 已知取舍：`date_from: null` 与「未传」目前都表现为 nil，无法显式清空日期。
 > 前端当前不发这两个字段，等有需求时再加 `clear_date` 之类的显式标志。
+
+**行程归属是个例外**：`trip_id: null` 无法区分「没传」和「移出行程」，所以
+`PlaceUpdate` 里另加了 `clear_trip: bool`——与 `PhotoUpdate.clear_place` 是同一套做法。
 
 ## `PhotoOut` 必须经 `NewPhotoOut()` 生成
 

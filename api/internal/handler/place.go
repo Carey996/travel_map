@@ -87,6 +87,10 @@ func (h *Handler) CreatePlace(c *gin.Context) {
 		Lat:      req.Lat,
 		Lng:      req.Lng,
 		Address:  req.Address,
+		Country:  strings.TrimSpace(req.Country),
+		Province: strings.TrimSpace(req.Province),
+		City:     strings.TrimSpace(req.City),
+		District: strings.TrimSpace(req.District),
 		Geocoded: req.Address != "",
 		Tags:     model.StringList{},
 	}
@@ -163,8 +167,22 @@ func (h *Handler) UpdatePlace(c *gin.Context) {
 	if req.DateTo != nil {
 		place.DateTo = req.DateTo.PtrTime()
 	}
-	if req.TripID != nil {
+	if req.ClearTrip {
+		place.TripID = nil
+	} else if req.TripID != nil {
 		place.TripID = req.TripID
+	}
+	if req.Country != nil {
+		place.Country = strings.TrimSpace(*req.Country)
+	}
+	if req.Province != nil {
+		place.Province = strings.TrimSpace(*req.Province)
+	}
+	if req.City != nil {
+		place.City = strings.TrimSpace(*req.City)
+	}
+	if req.District != nil {
+		place.District = strings.TrimSpace(*req.District)
 	}
 
 	if err := h.DB.WithContext(ctx(c)).Save(place).Error; err != nil {

@@ -9,16 +9,16 @@
 | 文件 | 职责 | 关键成员 |
 |---|---|---|
 | `auth.ts` | 当前用户与登录态 | `user`, `isAuthenticated`, `checking`, `restore()`, `login()`, `register()`, `logout()` |
-| `gallery.ts` | 相册主状态：地点、照片、笔记、选中项 | 见下表 |
+| `gallery.ts` | 相册主状态：地点、照片、行程、笔记、选中项 | 见下表 |
 
 ### gallery 的成员
 
 | 类别 | 成员 |
 |---|---|
-| 数据 | `places`, `photos`, `unplacedPhotos`, `notes` |
+| 数据 | `places`, `photos`, `trips`, `unplacedPhotos`, `notes` |
 | 状态 | `loading`, `notesLoading`, `selectedPlaceId`, `selectedPhotoId` |
-| 派生 | `selectedPlace`, `selectedPhoto`, `locatedPhotos`, `photosOfSelectedPlace` |
-| 动作 | `refresh()`, `selectPlace()`, `fillMissingNames()`, `createPlace()`, `updatePlace()`, `deletePlace()`, `mergePlace()`, `assignUnplacedTo()`, `updatePhoto()`, `deletePhoto()`, `createNote()`, `updateNote()`, `deleteNote()`, `reset()` |
+| 派生 | `selectedPlace`, `selectedPhoto`, `locatedPhotos`, `photosOfSelectedPlace`, `placesOfTrip()` |
+| 动作 | `refresh()`, `selectPlace()`, `fillMissingNames()`, `createPlace()`, `updatePlace()`, `deletePlace()`, `mergePlace()`, `assignUnplacedTo()`, `updatePhoto()`, `deletePhoto()`, `createTrip()`, `renameTrip()`, `deleteTrip()`, `setPlaceTrip()`, `createNote()`, `updateNote()`, `deleteNote()`, `reset()` |
 
 ## 为什么是「全量拉取 + 派生」
 
@@ -36,9 +36,12 @@
 **`auth.restore()` 把 401 当作正常状态。** 启动时调 `/auth/me`，未登录会返回 401，
 这不是错误，只是在把 `checking` 置回 false 表示「确认过了，未登录」。
 
-**`fillMissingNames()` 会记住失败过的地点。** 上传后新建的地点没有名字，
-它会调反向地理编码补上。若地名服务不可达，该地点会被移出「已尝试」集合以便下次重试——
-但不会在本次循环里死循环。
+**`fillMissingNames()` 一次补两样东西。** 上传后新建的地点既没有名字、也没有行政区划，
+它用**同一个** `/geo/reverse` 结果同时补 `name` 与 `country/province/city/district`
+（后者供地图按缩放归一分组用）——不会为了行政区划再打一遍地名服务。
+
+若地名服务不可达，该地点会被移出「已尝试」集合以便下次重试，但不会被反复重试到死循环。
+每轮最多补 40 个（`GEOCODE_BATCH`），避免一次打开就打出几百个请求。
 
 ## 相关
 

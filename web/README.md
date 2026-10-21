@@ -84,7 +84,7 @@ web/
 | 文件 | 职责 |
 |---|---|
 | `auth.ts` | 当前用户；`restore()` 在启动时调 `/auth/me` 确认登录态（401 视为未登录而非错误） |
-| `gallery.ts` | 相册主状态：地点、照片、未定位照片、笔记，以及选中项；写操作后统一 `refresh()`；`fillMissingNames()` 给未命名地点补反向地理编码结果 |
+| `gallery.ts` | 相册主状态：地点、照片、行程、未定位照片、笔记与选中项；写操作后统一 `refresh()`；`fillMissingNames()` 用一处反向地理编码结果同时补名字与行政区划 |
 
 > 数据量不大（个人旅行博客），所以**一次性全量拉取后在内存里派生视图**，
 > 而不是给每个视图单独发请求。这让组件很薄，也让「上传后各处同步更新」变成一次 refresh。
@@ -95,7 +95,7 @@ web/
 |---|---|---|
 | `TopBar.vue` | 单行工具条：地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`（远程搜索）、`el-select`、`el-checkbox`、`el-tooltip`、`el-avatar`、`el-dropdown` |
 | `PlaceSidebar.vue` | 地点列表（含本地筛选）/ 时间线 / 未定位三个视图 | `el-radio-group`（分段切换）、`el-input`、`el-scrollbar`、`el-image`、`el-skeleton`、`el-empty`、`el-alert` |
-| `MapCanvas.vue` | Leaflet 地图：聚合大头针、高缩放下的照片点、坐标系纠偏、相机控制 | 无（Leaflet 直接使用） |
+| `MapCanvas.vue` | Leaflet 地图：**按缩放归一分组**、单个地点大头针、旅行彩色框、高缩放下的照片点、坐标系纠偏 | 无（Leaflet 直接使用） |
 | `PlaceDrawer.vue` | 地点详情：改名、分类、评分、标签、Markdown 摘要、照片、笔记、合并与删除 | `el-drawer`、`el-input`、`el-select`、`el-rate`、`el-tag`、`el-date-picker`、`el-collapse`、`ElMessageBox` |
 | `PhotoLightbox.vue` | 大图查看、EXIF 信息、说明编辑、定位与删除，方向键切换 | `el-dialog`、`el-image`、`el-descriptions` |
 | `PhotoUploader.vue` | 上传入口；Element Plus 负责拖拽区与逐张状态，真实编排交给 `lib/upload.ts` | `el-upload`（自定义 `http-request`） |
@@ -113,6 +113,7 @@ web/
 | `upload.ts` | 单张照片的完整上传编排与带并发上限的批量上传 | `uploadPhotoFile`, `uploadMany` |
 | `markdown.ts` | 极简 Markdown 渲染（先整体转义再有限替换） | `renderMarkdown` |
 | `format.ts` | 日期、体积、坐标等展示格式化 | `formatDate`, `formatDayLabel`, `formatBytes`, `formatCoords` |
+| `trips.ts` | 旅行配色：按 id 哈希取固定色，列表 / 地图框 / 标签三处共用 | `TRIP_COLORS`, `tripColor` |
 
 ### 其他
 

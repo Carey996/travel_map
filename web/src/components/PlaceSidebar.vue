@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /** 左栏：地点列表 / 时间线 / 未定位照片 三个视图。 */
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-import type { Photo } from '@/api/client';
+import type { Photo, Trip } from '@/api/client';
 import { formatDate, formatDayLabel } from '@/lib/format';
+import { tripColor } from '@/lib/trips';
 import { useGalleryStore } from '@/stores/gallery';
 
 const emit = defineEmits<{
@@ -12,12 +14,13 @@ const emit = defineEmits<{
   (event: 'open-photo', photo: Photo): void;
   (event: 'place-unplaced'): void;
   (event: 'add-photos'): void;
+  (event: 'focus-trip', tripId: string): void;
 }>();
 
 const gallery = useGalleryStore();
 const { t, locale } = useI18n();
 
-const tab = ref<'places' | 'timeline' | 'unplaced'>('places');
+const tab = ref<'places' | 'trips' | 'timeline' | 'unplaced'>('places');
 const filter = ref('');
 
 function coverOf(placeId: string): Photo | null {
@@ -32,6 +35,25 @@ const visiblePlaces = computed(() => {
     [place.name, place.address ?? ''].join(' ').toLowerCase().includes(keyword),
   );
 });
+
+async function onDeleteTrip(trip: Trip): Promise<void> {
+  const name = trip.title || t('trip.untitled');
+  try {
+    await ElMessageBox.confirm(t('trip.confirmDelete', { name }), t('common.confirm'), {
+      type: 'warning',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
+    });
+  } catch {
+    return;
+  }
+  try {
+    await gallery.deleteTrip(trip.id);
+    ElMessage.success(t('trip.deleted'));
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
 
 /** 按「天」把照片分组，用于时间线视图 */
 const timeline = computed(() => {
@@ -56,6 +78,10 @@ const timeline = computed(() => {
         <el-radio-button value="places">
           <el-icon><Location /></el-icon>
           <span>{{ t('tabs.places') }}</span>
+        </el-radio-button>
+        <el-radio-button value="trips">
+          <el-icon><Flag /></el-icon>
+          <span>{{ t('tabs.trips') }}</span>
         </el-radio-button>
         <el-radio-button value="timeline">
           <el-icon><Clock /></el-icon>
@@ -117,6 +143,31 @@ const timeline = computed(() => {
                   <span>{{ t('place.photoCount', { n: place.photo_count ?? 0 }) }}</span>
                 </span>
               </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'trips'">
+          <el-empty v-if="gallery.trips.length === 0" :description="t('trip.empty')" :image-size="72" />
+          <div v-else class="trip-list">
+            <div
+              v-for="trip in gallery.trips"
+              :key="trip.id"
+              class="trip-card"
+              @click="emit('focus-trip', trip.id)"
+            >
+              <span class="trip-dot" :style="{ background: tripColor(trip.id) }" />
+              <div class="trip-text">
+                <span class="trip-title">{{ trip.title || t('trip.untitled') }}</span>
+                <span class="place-sub">
+                  <span>{{ t('trip.placeCount', { n: trip.place_count }) }}</span>
+                  <span class="dot">·</span>
+                  <span>{{ t('trip.photoCount', { n: trip.photo_count }) }}</span>
+                </span>
+              </div>
+              <el-button text size="small" class="trip-del" @click.stop="onDeleteTrip(trip)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
             </div>
           </div>
         </template>
@@ -235,6 +286,58 @@ const timeline = computed(() => {
 
 .sidebar-inner {
   padding: 12px;
+}
+
+.trip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trip-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--tb-radius);
+  cursor: pointer;
+  transition: background 0.16s, box-shadow 0.16s;
+}
+
+.trip-card:hover {
+  background: var(--el-fill-color-light);
+  box-shadow: var(--tb-shadow-1);
+}
+
+.trip-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 3px;
+}
+
+.trip-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-del {
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+
+.trip-card:hover .trip-del {
+  opacity: 1;
 }
 
 .sidebar-actions {

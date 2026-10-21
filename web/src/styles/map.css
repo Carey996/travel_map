@@ -224,3 +224,85 @@
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
 }
+
+/* ---------------- 缩放归一后的分组气泡 ---------------- */
+
+.cluster-wrap {
+  background: none !important;
+  border: 0 !important;
+}
+
+.cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px 0 6px;
+  border-radius: 999px;
+  background: var(--el-color-primary);
+  color: #fff;
+  border: 2px solid color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--el-color-primary) 42%, transparent);
+  white-space: nowrap;
+  transition: transform 0.16s ease;
+}
+
+.cluster:hover {
+  transform: scale(1.05);
+}
+
+.cluster-count {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cluster-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* 越往外归得越粗，颜色也越淡：国家 < 省 < 市 */
+.cluster-country {
+  background: color-mix(in srgb, var(--el-color-primary) 78%, #6b7280);
+}
+
+.cluster-province {
+  background: color-mix(in srgb, var(--el-color-primary) 92%, transparent);
+}
+
+.cluster-city {
+  background: var(--el-color-primary);
+}
+
+/* ---------------- 旅行框上的名称标签 ---------------- */
+
+.trip-tip {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.trip-tip::before {
+  display: none;
+}
+
+.trip-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  white-space: nowrap;
+}

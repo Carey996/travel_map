@@ -12,7 +12,14 @@
     "signUp": "Create account", "signOut": "Sign out",
     "emailRequired": "Email is required", "emailInvalid": "Invalid email address", "passwordRequired": "Password is required"
   },
-  "tabs": { "places": "Places", "timeline": "Timeline", "unplaced": "Unplaced" },
+  "tabs": { "places": "Places", "trips": "Trips", "timeline": "Timeline", "unplaced": "Unplaced" },
+  "trip": {
+    "untitled": "Untitled trip", "new": "New trip", "empty": "No trips yet",
+    "namePlaceholder": "e.g. Henan 2025", "attach": "Trip", "none": "Not in a trip",
+    "placeCount": "{n} places", "photoCount": "{n} photos",
+    "confirmDelete": "Delete “{name}”? The places themselves are kept and simply leave this trip.",
+    "deleted": "Trip deleted", "created": "Added to the new trip", "needTitle": "Give this trip a name"
+  },
   "map": {
     "searchPlaceholder": "Search a city or place…", "newPlace": "New place",
     "clickToPlace": "Click the map", "placeModeHint": "Click a spot on the map to create a place",

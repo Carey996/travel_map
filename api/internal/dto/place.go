@@ -10,11 +10,15 @@ import (
 
 // PlaceCreate 新建地点的请求。
 type PlaceCreate struct {
-	Name    string  `json:"name" binding:"max=160"`
-	Kind    string  `json:"kind" binding:"omitempty,oneof=city spot region other"`
-	Lat     float64 `json:"lat" binding:"required,gte=-90,lte=90"`
-	Lng     float64 `json:"lng" binding:"required,gte=-180,lte=180"`
-	Address string  `json:"address" binding:"max=400"`
+	Name     string  `json:"name" binding:"max=160"`
+	Kind     string  `json:"kind" binding:"omitempty,oneof=city spot region other"`
+	Lat      float64 `json:"lat" binding:"required,gte=-90,lte=90"`
+	Lng      float64 `json:"lng" binding:"required,gte=-180,lte=180"`
+	Address  string  `json:"address" binding:"max=400"`
+	Country  string  `json:"country" binding:"max=80"`
+	Province string  `json:"province" binding:"max=80"`
+	City     string  `json:"city" binding:"max=80"`
+	District string  `json:"district" binding:"max=80"`
 }
 
 // PlaceUpdate 更新地点；字段用指针以区分「未传」与「传了零值」。
@@ -29,6 +33,13 @@ type PlaceUpdate struct {
 	DateFrom  *DateOnly  `json:"date_from"`
 	DateTo    *DateOnly  `json:"date_to"`
 	TripID    *uuid.UUID `json:"trip_id"`
+	// ClearTrip 显式解除行程归属；trip_id 为 null 时无法区分「没传」和「清空」
+	ClearTrip bool `json:"clear_trip"`
+
+	Country  *string `json:"country" binding:"omitempty,max=80"`
+	Province *string `json:"province" binding:"omitempty,max=80"`
+	City     *string `json:"city" binding:"omitempty,max=80"`
+	District *string `json:"district" binding:"omitempty,max=80"`
 }
 
 // PlaceOut 是地点的对外表示。
@@ -39,6 +50,10 @@ type PlaceOut struct {
 	Lat       float64    `json:"lat"`
 	Lng       float64    `json:"lng"`
 	Address   string     `json:"address"`
+	Country   string     `json:"country"`
+	Province  string     `json:"province"`
+	City      string     `json:"city"`
+	District  string     `json:"district"`
 	Geocoded  bool       `json:"geocoded"`
 	SummaryMD string     `json:"summary_md"`
 	Tags      []string   `json:"tags"`
@@ -66,6 +81,7 @@ func NewPlaceOut(p *model.Place) PlaceOut {
 	return PlaceOut{
 		ID: p.ID, Name: p.Name, Kind: p.Kind, Lat: p.Lat, Lng: p.Lng,
 		Address: p.Address, Geocoded: p.Geocoded, SummaryMD: p.SummaryMD,
+		Country: p.Country, Province: p.Province, City: p.City, District: p.District,
 		Tags: tags, Rating: p.Rating,
 		DateFrom: PtrDateOnly(p.DateFrom), DateTo: PtrDateOnly(p.DateTo),
 		TripID: p.TripID, CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt,

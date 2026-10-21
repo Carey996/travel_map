@@ -150,7 +150,8 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 | `places` | 地点：地图上的一个大头针，可以是城市也可以是景点；含摘要/标签/评分/日期范围 |
 | `photos` | 照片元数据；二进制在对象存储，这里只存对象键与 EXIF 结果 |
 | `notes` | 旅行笔记，挂在地点下，**一个地点可写多篇** |
-| `trips` / `trip_places` | 把多个地点串成一次旅行（表结构已就绪，界面待启用） |
+| `trips` | 一次旅行；`places.trip_id` 指向它，地图据此画彩色框 |
+| `trip_places` | 行程与地点的连接表，带顺序与第几天（留给后续行程页，当前未使用） |
 | `shares` | 公开只读分享链接（表结构已就绪） |
 | `user_sessions` | 会话记录，仅当 `SESSION_BACKEND=db` 时使用 |
 
@@ -161,6 +162,8 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
   并不总是可靠（`MD` 不在 GORM 的 commonInitialisms 名单里），显式声明彻底消除隐患。
 - **`photos.content_hash` 每用户唯一**（而非全局唯一）：两个用户拍到同一张图不应互相冲突。
 - **`tags` 用 jsonb**：与 Python 版保持一致。
+- **行政区划存四列**（`country` / `province` / `city` / `district`）：由前端驱动、
+  复用一处 `/geo/reverse` 结果回填，地图按缩放级别取其中一层做分组标签。
 
 ---
 
@@ -194,6 +197,13 @@ GET    /api/v1/notes                    列出笔记
 POST   /api/v1/notes                    写一篇笔记
 PATCH  /api/v1/notes/:note_id           更新笔记
 DELETE /api/v1/notes/:note_id           删除笔记
+
+GET    /api/v1/trips                    列出旅行（带地点数 / 照片数）
+POST   /api/v1/trips                    新建旅行
+PATCH  /api/v1/trips/:id                改名 / 改摘要 / 改日期
+DELETE /api/v1/trips/:id                删除旅行（地点保留）
+POST   /api/v1/trips/:id/places         批量把地点加进旅行
+DELETE /api/v1/trips/:id/places/:place_id  把某个地点移出旅行
 
 GET    /api/v1/geo/reverse?lat=&lng=    经纬度 -> 地名
 GET    /api/v1/geo/search?q=            地名搜索

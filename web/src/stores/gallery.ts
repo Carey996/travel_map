@@ -1,7 +1,30 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
-import { api, type Note, type Photo, type Place, type PlaceKind } from '@/api/client';
+import { api, type Note, type Photo, type Place, type PlaceKind, type Trip } from '@/api/client';
+
+/** 单次刷新最多补多少条地理编码，避免一次打开就打出几十个请求 */
+const GEOCODE_BATCH = 40;
+
+/**
+ * 从反向地理编码的 address 里取行政区划。
+ * Photon 给 state/city/district，Nominatim 还给 province/county/town，都认一下。
+ */
+function pickAdmin(address: Record<string, unknown> | undefined) {
+  const pick = (...keys: string[]): string => {
+    for (const key of keys) {
+      const value = address?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  };
+  return {
+    country: pick('country'),
+    province: pick('state', 'province'),
+    city: pick('city', 'town', 'municipality', 'village'),
+    district: pick('district', 'county', 'city_district', 'suburb'),
+  };
+}
 
 /**
  * 相册主状态：地点、照片、笔记，以及当前选中项。
@@ -12,6 +35,7 @@ import { api, type Note, type Photo, type Place, type PlaceKind } from '@/api/cl
 export const useGalleryStore = defineStore('gallery', () => {
   const places = ref<Place[]>([]);
   const photos = ref<Photo[]>([]);
+  const trips = ref<Trip[]>([]);
   const unplacedPhotos = ref<Photo[]>([]);
   const notes = ref<Note[]>([]);
 
@@ -41,14 +65,16 @@ export const useGalleryStore = defineStore('gallery', () => {
   async function refresh(): Promise<void> {
     loading.value = true;
     try {
-      const [nextPlaces, nextPhotos, nextUnplaced] = await Promise.all([
+      const [nextPlaces, nextPhotos, nextUnplaced, nextTrips] = await Promise.all([
         api.listPlaces(),
         api.listPhotos({ limit: 2000 }),
         api.listPhotos({ unplaced: true, limit: 2000 }),
+        api.listTrips(),
       ]);
       places.value = nextPlaces;
       photos.value = nextPhotos;
       unplacedPhotos.value = nextUnplaced;
+      trips.value = nextTrips;
     } finally {
       loading.value = false;
     }
@@ -72,11 +98,14 @@ export const useGalleryStore = defineStore('gallery', () => {
     await loadNotes(placeId);
   }
 
-  /** 给还没有名字的地点补一个反向地理编码结果。失败静默——用户可以手动改名。 */
+  /**
+   * 给地点补反向地理编码结果：缺名字的补名字，缺行政区划的补行政区划。
+   * 失败静默——用户可以手动改名，地图也会退回按距离分组。
+   */
   async function fillMissingNames(): Promise<boolean> {
-    const pending = places.value.filter(
-      (place) => !place.geocoded && !geocodeAttempted.has(place.id),
-    );
+    const pending = places.value
+      .filter((place) => (!place.geocoded || !place.province) && !geocodeAttempted.has(place.id))
+      .slice(0, GEOCODE_BATCH);
     if (pending.length === 0) return false;
 
     let changed = false;
@@ -84,11 +113,20 @@ export const useGalleryStore = defineStore('gallery', () => {
       geocodeAttempted.add(place.id);
       try {
         const info = await api.reverseGeocode(place.lat, place.lng);
-        await api.updatePlace(place.id, {
-          name: info.name,
-          kind: info.kind,
+        const admin = pickAdmin(info.address);
+        const payload: Record<string, unknown> = {
           address: info.display_name,
-        });
+          country: admin.country,
+          province: admin.province,
+          city: admin.city,
+          district: admin.district,
+        };
+        // 只在还没名字时改名字，避免覆盖用户自己起的名字
+        if (!place.geocoded) {
+          payload.name = info.name;
+          payload.kind = info.kind;
+        }
+        await api.updatePlace(place.id, payload);
         changed = true;
       } catch {
         // 地名服务不可用时保持原样，等待下次刷新重试
@@ -135,6 +173,35 @@ export const useGalleryStore = defineStore('gallery', () => {
     if (ids.length === 0) return;
     await api.assignPhotos(placeId, ids);
     await refresh();
+  }
+
+  // ---- 行程 ----
+
+  async function createTrip(payload: { title?: string; date_from?: string | null; date_to?: string | null }): Promise<Trip> {
+    const trip = await api.createTrip(payload);
+    await refresh();
+    return trip;
+  }
+
+  async function renameTrip(id: string, title: string): Promise<void> {
+    await api.updateTrip(id, { title });
+    await refresh();
+  }
+
+  async function deleteTrip(id: string): Promise<void> {
+    await api.deleteTrip(id);
+    await refresh();
+  }
+
+  /** 把地点放进某个行程；tripId 传 null 表示移出 */
+  async function setPlaceTrip(placeId: string, tripId: string | null): Promise<void> {
+    await api.updatePlace(placeId, tripId ? { trip_id: tripId } : { clear_trip: true });
+    await refresh();
+  }
+
+  /** 某个行程下的地点 */
+  function placesOfTrip(tripId: string): Place[] {
+    return places.value.filter((place) => place.trip_id === tripId);
   }
 
   // ---- 照片 ----
@@ -186,6 +253,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   function reset(): void {
     places.value = [];
     photos.value = [];
+    trips.value = [];
     unplacedPhotos.value = [];
     notes.value = [];
     selectedPlaceId.value = null;
@@ -196,6 +264,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   return {
     places,
     photos,
+    trips,
     unplacedPhotos,
     notes,
     loading,
@@ -221,6 +290,11 @@ export const useGalleryStore = defineStore('gallery', () => {
     createNote,
     updateNote,
     deleteNote,
+    createTrip,
+    renameTrip,
+    deleteTrip,
+    setPlaceTrip,
+    placesOfTrip,
     reset,
   };
 });

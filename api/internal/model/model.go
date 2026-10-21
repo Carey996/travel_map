@@ -58,6 +58,13 @@ type Place struct {
 	DateFrom  *time.Time `gorm:"column:date_from;type:date" json:"date_from"`
 	DateTo    *time.Time `gorm:"column:date_to;type:date" json:"date_to"`
 	Address   string     `gorm:"column:address;size:400;not null;default:''" json:"address"`
+
+	// 行政区划：由反向地理编码回填，供地图按缩放级别归一分组（国家 -> 省 -> 市 -> 地点）
+	Country  string `gorm:"column:country;size:80;not null;default:''" json:"country"`
+	Province string `gorm:"column:province;size:80;not null;default:''" json:"province"`
+	City     string `gorm:"column:city;size:80;not null;default:''" json:"city"`
+	District string `gorm:"column:district;size:80;not null;default:''" json:"district"`
+
 	Geocoded  bool       `gorm:"column:geocoded;not null;default:false" json:"geocoded"`
 	CreatedAt time.Time  `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"column:updated_at;not null" json:"updated_at"`

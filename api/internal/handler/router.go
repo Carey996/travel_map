@@ -56,6 +56,16 @@ func (h *Handler) Router() *gin.Engine {
 		photos.DELETE("/:photo_id", h.DeletePhoto)
 	}
 
+	trips := v1.Group("/trips")
+	{
+		trips.GET("", h.ListTrips)
+		trips.POST("", h.CreateTrip)
+		trips.PATCH("/:id", h.UpdateTrip)
+		trips.DELETE("/:id", h.DeleteTrip)
+		trips.POST("/:id/places", h.AddTripPlaces)
+		trips.DELETE("/:id/places/:place_id", h.RemoveTripPlace)
+	}
+
 	notes := v1.Group("/notes")
 	{
 		notes.GET("", h.ListNotes)

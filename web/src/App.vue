@@ -34,6 +34,7 @@ const showPhotoDots = ref(true);
 const placing = ref<'place' | 'photos' | null>(null);
 const focus = ref<MapFocus | null>(null);
 const fitToken = ref(0);
+const tripFocus = ref<{ id: string; token: number } | null>(null);
 
 const dragging = ref(false);
 const batch = ref<{ done: number; total: number } | null>(null);
@@ -152,6 +153,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('drop', onDrop);
 });
 
+/** 侧栏点了某次旅行：地图缩放到这次旅行的全部地点 */
+function onFocusTrip(tripId: string): void {
+  void gallery.selectPlace(null);
+  tripFocus.value = { id: tripId, token: Date.now() };
+}
+
 function onPhotoLocated(photo: Photo): void {
   gallery.selectedPhotoId = null;
   if (photo.lat !== null && photo.lng !== null) {
@@ -198,21 +205,25 @@ function onSetPhotoLocation(): void {
             ElMessage.info(t('map.pickPointForPhotos'));
           "
           @add-photos="fileInput?.click()"
+          @focus-trip="onFocusTrip"
         />
 
         <main class="map-area">
           <MapCanvas
             :places="gallery.places"
             :photos="gallery.locatedPhotos"
+            :trips="gallery.trips"
             :selected-place-id="gallery.selectedPlaceId"
             :tile-provider-id="tileProviderId"
             :show-photo-dots="showPhotoDots"
             :placing-mode="placing !== null"
             :focus="focus"
             :fit-token="fitToken"
+            :focus-trip="tripFocus"
             @select-place="(id: string | null) => gallery.selectPlace(id)"
             @map-click="onMapClick"
             @photo-click="(photo: Photo) => (gallery.selectedPhotoId = photo.id)"
+            @focus-trip="onFocusTrip"
           />
 
           <el-card v-if="!hasPlaces && !gallery.loading" class="map-hint" shadow="always">

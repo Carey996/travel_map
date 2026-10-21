@@ -11,7 +11,7 @@
 | `LoginView.vue` | 登录 / 注册，带表单校验 | `el-card`, `el-form`, `el-alert` |
 | `TopBar.vue` | 地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`, `el-select`, `el-checkbox`, `el-radio-group`, `el-tooltip`, `el-avatar`, `el-dropdown` |
 | `PlaceSidebar.vue` | 地点列表（含本地筛选）/ 时间线 / 未定位三个视图 | `el-radio-group`（分段切换）, `el-input`（筛选）, `el-scrollbar`, `el-image`, `el-skeleton`, `el-empty` |
-| `MapCanvas.vue` | Leaflet 地图：聚合大头针、照片点、坐标纠偏、相机控制 | 无（Leaflet 直接使用） |
+| `MapCanvas.vue` | Leaflet 地图：按缩放归一分组、地点大头针、旅行框、照片点、坐标纠偏 | 无（Leaflet 直接使用） |
 | `PlaceDrawer.vue` | 地点详情：改名、分类、评分、标签、Markdown、照片、笔记、合并与删除 | `el-drawer`, `el-input`, `el-select`, `el-rate`, `el-tag`, `el-date-picker`, `el-collapse`, `ElMessageBox` |
 | `PhotoLightbox.vue` | 大图查看、EXIF 信息、说明编辑、定位与删除 | `el-dialog`, `el-image`, `el-descriptions` |
 | `PhotoUploader.vue` | 上传入口，Element Plus 负责 UI，编排交给 `lib/upload.ts` | `el-upload`（自定义 `http-request`） |
@@ -68,6 +68,17 @@ Leaflet 对象内部有大量自引用与 DOM 引用，被 Vue 的 Proxy 包裹�
 **坐标进出都要过 `lib/coords.ts`**，依据底图源的 `crs` 决定是否纠偏。
 
 **在高缩放级别渲染照片点时有上限**（400 个），避免一次插入过多 DOM 节点。
+
+## MapCanvas 里的两条业务规则
+
+**缩放归一。** `levelForZoom()` 把缩放切成四档：`z≤5` 国家、`6–8` 省、`9–11` 市、
+`≥12` 单个地点。前三档不画单个地点，而是按 `places.country/province/city` 聚成一个气泡，
+气泡上的数字是该组的**照片总数**，点击即 `fitBounds` 到这一组。
+行政区划缺失时退化成按经纬度网格分桶（省 2°、市 0.5°），避免把相隔上千公里的无名地点并成一个点。
+
+**旅行框。** 每个 trip 取它名下地点的包围盒，向外留一点边（单点也有最小半径），
+画成同色虚线矩形 + 一个常驻标签。颜色来自 `lib/trips.ts` 的 `tripColor(id)`，
+**不存库**——服务端保持无状态，颜色纯粹是表现层的事。框的点击会上抛 `focus-trip` 事件。
 
 ## 相关
 

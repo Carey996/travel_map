@@ -51,6 +51,11 @@ export type Place = {
   lat: number;
   lng: number;
   address: string;
+  /** 行政区划：由反向地理编码回填，地图按缩放归一分组时用 */
+  country: string;
+  province: string;
+  city: string;
+  district: string;
   geocoded: boolean;
   summary_md: string;
   tags: string[];
@@ -96,6 +101,19 @@ export type Note = {
   title: string;
   body_md: string;
   happened_on: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** 行程：把多个地点串成一次旅行，地图上用彩色框标注。 */
+export type Trip = {
+  id: string;
+  title: string;
+  summary_md: string;
+  date_from: string | null;
+  date_to: string | null;
+  place_count: number;
+  photo_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -244,9 +262,18 @@ export const api = {
   listPlaces: (params?: { bbox?: string; q?: string }) =>
     apiFetch<Place[]>('/api/v1/places' + buildQuery(params)),
   getPlace: (id: string) => apiFetch<Place>('/api/v1/places/' + id),
-  createPlace: (payload: { name?: string; kind?: PlaceKind; lat: number; lng: number; address?: string }) =>
-    apiFetch<Place>('/api/v1/places', { method: 'POST', ...json(payload) }),
-  updatePlace: (id: string, payload: Partial<Place>) =>
+  createPlace: (payload: {
+    name?: string;
+    kind?: PlaceKind;
+    lat: number;
+    lng: number;
+    address?: string;
+    country?: string;
+    province?: string;
+    city?: string;
+    district?: string;
+  }) => apiFetch<Place>('/api/v1/places', { method: 'POST', ...json(payload) }),
+  updatePlace: (id: string, payload: Partial<Place> & { clear_trip?: boolean }) =>
     apiFetch<Place>('/api/v1/places/' + id, { method: 'PATCH', ...json(payload) }),
   deletePlace: (id: string, deletePhotos = false) =>
     apiFetch<void>('/api/v1/places/' + id + buildQuery({ delete_photos: deletePhotos }), { method: 'DELETE' }),
@@ -270,6 +297,18 @@ export const api = {
   updatePhoto: (id: string, payload: { caption?: string; place_id?: string; clear_place?: boolean; lat?: number; lng?: number }) =>
     apiFetch<Photo>('/api/v1/photos/' + id, { method: 'PATCH', ...json(payload) }),
   deletePhoto: (id: string) => apiFetch<void>('/api/v1/photos/' + id, { method: 'DELETE' }),
+
+  // ---- 行程 ----
+  listTrips: () => apiFetch<Trip[]>('/api/v1/trips'),
+  createTrip: (payload: { title?: string; summary_md?: string; date_from?: string | null; date_to?: string | null }) =>
+    apiFetch<Trip>('/api/v1/trips', { method: 'POST', ...json(payload) }),
+  updateTrip: (id: string, payload: { title?: string; summary_md?: string; date_from?: string | null; date_to?: string | null }) =>
+    apiFetch<Trip>('/api/v1/trips/' + id, { method: 'PATCH', ...json(payload) }),
+  deleteTrip: (id: string) => apiFetch<void>('/api/v1/trips/' + id, { method: 'DELETE' }),
+  addTripPlaces: (id: string, placeIds: string[]) =>
+    apiFetch<{ updated: number }>('/api/v1/trips/' + id + '/places', { method: 'POST', ...json({ place_ids: placeIds }) }),
+  removeTripPlace: (tripId: string, placeId: string) =>
+    apiFetch<void>('/api/v1/trips/' + tripId + '/places/' + placeId, { method: 'DELETE' }),
 
   // ---- 笔记 ----
   listNotes: (placeId?: string) => apiFetch<Note[]>('/api/v1/notes' + buildQuery({ place_id: placeId })),

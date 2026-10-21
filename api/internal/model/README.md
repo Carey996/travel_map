@@ -12,7 +12,8 @@
 ```
 User ─┬─< Place ─┬─< Photo
       │          └─< Note
-      ├─< Trip ──< TripPlace >── Place      （行程串联，界面待启用）
+      ├─< Trip >── Place                   （行程：places.trip_id 单向归属）
+      │   └─< TripPlace                  （顺序 / 第几天，留给后续行程页）
       ├─< Share                             （公开分享，界面待启用）
       └─< UserSession                       （仅 SESSION_BACKEND=db 时使用）
 ```
@@ -29,6 +30,14 @@ commonInitialisms 名单里，转换结果可能是 `summary_m_d`。显式声明
 **3. 主键在 `BeforeCreate` 里生成 UUID v7。** 时间有序，且无状态服务可本地生成，
 无需向数据库申请序列。`uuid.NewV7()` 失败时退化为 v4——理论上不会发生，
 但也好过 panic。
+
+## Place 上的行政区划
+
+`country` / `province` / `city` / `district` 四列由**反向地理编码回填**（Photon 的
+`state` / `city` / `district`，Nominatim 的 `state` / `city` / `county`），
+地图按缩放级别归一分组时用它们做标签：「缩小时归到省，放大点归到市」。
+
+四列都允许为空：地名服务没数据时留空，前端退回按经纬度网格分组。
 
 ## 字段可见性
 

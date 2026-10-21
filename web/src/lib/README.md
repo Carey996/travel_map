@@ -19,6 +19,7 @@
 | `upload.ts` | 单张照片的上传编排与带并发上限的批量上传 | `uploadPhotoFile`, `uploadMany`, `UploadOutcome` |
 | `markdown.ts` | 极简 Markdown 渲染（先整体转义，再做有限替换） | `renderMarkdown` |
 | `format.ts` | 日期、体积、坐标等展示格式化 | `formatDate`, `formatDateTime`, `formatDayLabel`, `formatBytes`, `formatCoords` |
+| `trips.ts` | 旅行的固定配色（按 id 哈希） | `TRIP_COLORS`, `tripColor` |
 
 ## 一个只在「临时用 IP 部署」时才会炸的点
 
