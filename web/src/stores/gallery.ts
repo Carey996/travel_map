@@ -22,7 +22,8 @@ function pickAdmin(address: Record<string, unknown> | undefined) {
     country: pick('country'),
     province: pick('state', 'province'),
     city: pick('city', 'town', 'municipality', 'village'),
-    district: pick('district', 'county', 'city_district', 'suburb'),
+    // 区/县一级：Photon 有 county 时用它；OSM 对国内很多地方只到街道，才退到 district
+    district: pick('county', 'city_district', 'district', 'suburb'),
   };
 }
 

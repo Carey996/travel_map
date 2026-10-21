@@ -76,13 +76,18 @@ function updateCoverage(): void {
 // 缩放归一：按行政区划把地点聚成一组
 // ---------------------------------------------------------------------------
 
-type ClusterLevel = 'country' | 'province' | 'city' | 'place';
+type ClusterLevel = 'country' | 'province' | 'city' | 'district' | 'place';
 
-/** 缩放分档：越往外归得越粗。改这里就能调整手感。 */
+/**
+ * 缩放分档：越往外归得越粗。改这里就能调整手感。
+ *
+ *   国家(z≤5) → 省(6-7) → 市(8-9) → 区/县(10-11) → 地点(≥12)
+ */
 function levelForZoom(zoom: number): ClusterLevel {
   if (zoom <= 5) return 'country';
-  if (zoom <= 8) return 'province';
-  if (zoom <= 11) return 'city';
+  if (zoom <= 7) return 'province';
+  if (zoom <= 9) return 'city';
+  if (zoom <= 11) return 'district';
   return 'place';
 }
 
@@ -92,8 +97,10 @@ function drillZoom(level: ClusterLevel): number {
     case 'country':
       return 7;
     case 'province':
-      return 10;
+      return 9;
     case 'city':
+      return 11;
+    case 'district':
       return 13;
     default:
       return 14;
@@ -114,12 +121,13 @@ function adminLabelOf(place: Place, level: ClusterLevel): string {
   if (level === 'country') return place.country || '';
   if (level === 'province') return place.province || '';
   if (level === 'city') return place.city || '';
+  if (level === 'district') return place.district || '';
   return '';
 }
 
 /** 没有行政区划时按网格兜底，避免把相隔上千公里的无名地点并成一个点 */
 function gridKeyOf(place: Place, level: ClusterLevel): string {
-  const size = level === 'country' ? 10 : level === 'province' ? 2 : 0.5;
+  const size = level === 'country' ? 10 : level === 'province' ? 2 : level === 'city' ? 0.5 : 0.1;
   return Math.round(place.lat / size) + ':' + Math.round(place.lng / size);
 }
 

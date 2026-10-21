@@ -269,17 +269,22 @@
   font-weight: 600;
 }
 
-/* 越往外归得越粗，颜色也越淡：国家 < 省 < 市 */
+/* 越往外归得越粗，颜色也越淡：国家 < 省 < 市 < 区县 */
 .cluster-country {
-  background: color-mix(in srgb, var(--el-color-primary) 78%, #6b7280);
+  background: color-mix(in srgb, var(--el-color-primary) 74%, #6b7280);
 }
 
 .cluster-province {
-  background: color-mix(in srgb, var(--el-color-primary) 92%, transparent);
+  background: color-mix(in srgb, var(--el-color-primary) 86%, transparent);
 }
 
 .cluster-city {
   background: var(--el-color-primary);
+}
+
+.cluster-district {
+  background: color-mix(in srgb, var(--el-color-primary) 88%, var(--el-color-primary-dark-2));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--el-color-primary) 32%, transparent);
 }
 
 /* ---------------- 旅行框上的名称标签 ---------------- */

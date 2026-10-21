@@ -254,7 +254,8 @@ func buildPhotonResult(p map[string]any, lat, lng float64) *Result {
 		Kind:    classify(str(props(p, "osm_key")), str(props(p, "osm_value"))),
 		Country: country,
 		Address: map[string]any{
-			"name": name, "locality": locality, "district": district, "city": city,
+			"name": name, "locality": locality, "suburb": str(props(p, "suburb")),
+			"county": str(props(p, "county")), "district": district, "city": city,
 			"state": state, "country": country,
 			"postcode": str(props(p, "postcode")), "street": str(props(p, "street")),
 			"osm_type": str(props(p, "osm_type")), "osm_value": str(props(p, "osm_value")),
