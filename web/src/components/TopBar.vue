@@ -232,19 +232,6 @@ async function onLogout(): Promise<void> {
   width: 158px;
 }
 
-.topbar :deep(.tb-check) {
-  height: 32px;
-  margin-right: 2px;
-}
-
-.topbar :deep(.tb-check .el-checkbox__label) {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding-left: 7px;
-  font-size: 13px;
-  color: var(--el-text-color-regular);
-}
 
 /* 账号入口：整块可点，比纯文字按钮更像一个「入口」 */
 .tb-user {
