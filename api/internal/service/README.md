@@ -4,7 +4,7 @@
 
 | 文件 | 职责 | 关键符号 |
 |---|---|---|
-| `place.go` | 照片自动归入地点、地点日期范围继承 | `AutoAssignRadiusM`, `NearestPlace()`, `AssignPhoto()` |
+| `place.go` | 照片自动归入地点（带 `user_id` 归属兜底）、地点日期范围继承 | `AutoAssignRadiusM`, `NearestPlace()`, `AssignPhoto()` |
 
 这个包**不依赖 Gin**，只接收 `context.Context` 与 `*gorm.DB`，因此可以独立测试。
 
@@ -17,13 +17,25 @@
 
 ```
 照片没有 GPS            -> 返回 nil，不归属任何地点（落进前端的「未定位」托盘）
-照片已有 place_id       -> 取该地点，仅更新日期范围
+照片已有 place_id       -> 先按 id AND user_id 取该地点（不存在/不属于当前用户 -> error）
+                           再更新日期范围
 1.5 km 内有已存在地点   -> 归入
 否则                    -> 就地新建一个「待命名」地点（geocoded=false），由前端随后补名字
 ```
 
 「就地新建」把命名成本从后端转移到了前端：上传时不做反向地理编码（那会拖慢响应、
 且地名服务可能不可达），而是由前端发现 `geocoded=false` 的地点后再异步补名。
+
+## 归属校验（防御性二次校验）
+
+handler 在登记照片 / PATCH 改归属时已经确认过 `place_id` 属于当前用户；
+`AssignPhoto()` 内部仍用 `First(&place, "id = ? AND user_id = ?")` 再查一次，查不到返回
+`apperr.NotFound("place_not_found", ...)` 而不是像早期版本那样静默返回 `nil, nil`。
+
+**为什么不靠 handler 一层就够。** 这个包不依赖 Gin，可以被任何调用方复用；
+如果它自己信任 `photo.PlaceID`，未来多一个调用点就多一条跨租户写入口
+（会改写他人地点的 `date_from` / `date_to`）。兜底的成本只是一次按主键 + `user_id`
+的查询，换来的是「业务层无法被误用」。
 
 ## 日期范围继承
 

@@ -9,6 +9,10 @@ import (
 )
 
 // RegisterRequest 注册请求。
+//
+// 注意：密码的 max=200 是按「字符数」校验的，管不住 bcrypt 的 72 字节硬上限
+// （24 个汉字就已 72 字节）。真正的字节级校验在 handler.passwordTooLong()，
+// 这里的 binding 只作为浅层防线，不要因为改了它而放松下面的检查。
 type RegisterRequest struct {
 	Email       string `json:"email" binding:"required,email,max=320"`
 	Password    string `json:"password" binding:"required,min=8,max=200"`

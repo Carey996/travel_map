@@ -121,7 +121,7 @@ func (h *Handler) DeleteNote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.DB.WithContext(ctx(c)).Where("id = ?", note.ID).Delete(&model.Note{}).Error; err != nil {
+	if err := h.DB.WithContext(ctx(c)).Where("id = ? AND user_id = ?", note.ID, user.ID).Delete(&model.Note{}).Error; err != nil {
 		h.fail(c, err)
 		return
 	}

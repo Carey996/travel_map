@@ -113,8 +113,8 @@ func (h *Handler) GetPlace(c *gin.Context) {
 	}
 
 	var photoCount, noteCount int64
-	h.DB.WithContext(ctx(c)).Model(&model.Photo{}).Where("place_id = ?", place.ID).Count(&photoCount)
-	h.DB.WithContext(ctx(c)).Model(&model.Note{}).Where("place_id = ?", place.ID).Count(&noteCount)
+	h.DB.WithContext(ctx(c)).Model(&model.Photo{}).Where("place_id = ? AND user_id = ?", place.ID, user.ID).Count(&photoCount)
+	h.DB.WithContext(ctx(c)).Model(&model.Note{}).Where("place_id = ? AND user_id = ?", place.ID, user.ID).Count(&noteCount)
 
 	c.JSON(http.StatusOK, dto.PlaceDetailOut{
 		PlaceOut:   dto.NewPlaceOut(place),
@@ -170,6 +170,17 @@ func (h *Handler) UpdatePlace(c *gin.Context) {
 	if req.ClearTrip {
 		place.TripID = nil
 	} else if req.TripID != nil {
+		// trip_id 来自客户端：必须确认该行程属于当前用户，否则可把地点塞进他人行程
+		var trip model.Trip
+		err := h.DB.WithContext(ctx(c)).First(&trip, "id = ? AND user_id = ?", *req.TripID, user.ID).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			h.fail(c, apperr.NotFound("trip_not_found", "行程不存在"))
+			return
+		}
+		if err != nil {
+			h.fail(c, err)
+			return
+		}
 		place.TripID = req.TripID
 	}
 	if req.Country != nil {
@@ -212,7 +223,7 @@ func (h *Handler) DeletePlace(c *gin.Context) {
 
 	if deletePhotos {
 		var photos []model.Photo
-		if err := tx.Where("place_id = ?", place.ID).Find(&photos).Error; err != nil {
+		if err := tx.Where("place_id = ? AND user_id = ?", place.ID, user.ID).Find(&photos).Error; err != nil {
 			tx.Rollback()
 			h.fail(c, err)
 			return
@@ -230,7 +241,7 @@ func (h *Handler) DeletePlace(c *gin.Context) {
 			}
 		}
 		if len(ids) > 0 {
-			if err := tx.Where("id IN ?", ids).Delete(&model.Photo{}).Error; err != nil {
+			if err := tx.Where("id IN ? AND user_id = ?", ids, user.ID).Delete(&model.Photo{}).Error; err != nil {
 				tx.Rollback()
 				h.fail(c, err)
 				return
@@ -240,7 +251,7 @@ func (h *Handler) DeletePlace(c *gin.Context) {
 		// 失败也只是留下孤儿对象，不会破坏一致性
 		defer func() { _ = h.Storage.Delete(ctx(c), keys) }()
 	} else {
-		if err := tx.Model(&model.Photo{}).Where("place_id = ?", place.ID).
+		if err := tx.Model(&model.Photo{}).Where("place_id = ? AND user_id = ?", place.ID, user.ID).
 			Update("place_id", nil).Error; err != nil {
 			tx.Rollback()
 			h.fail(c, err)
@@ -248,12 +259,12 @@ func (h *Handler) DeletePlace(c *gin.Context) {
 		}
 	}
 
-	if err := tx.Where("place_id = ?", place.ID).Delete(&model.Note{}).Error; err != nil {
+	if err := tx.Where("place_id = ? AND user_id = ?", place.ID, user.ID).Delete(&model.Note{}).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
 	}
-	if err := tx.Where("id = ?", place.ID).Delete(&model.Place{}).Error; err != nil {
+	if err := tx.Where("id = ? AND user_id = ?", place.ID, user.ID).Delete(&model.Place{}).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
@@ -288,8 +299,8 @@ func (h *Handler) AssignPhotos(c *gin.Context) {
 	}
 
 	var photoCount, noteCount int64
-	h.DB.WithContext(ctx(c)).Model(&model.Photo{}).Where("place_id = ?", place.ID).Count(&photoCount)
-	h.DB.WithContext(ctx(c)).Model(&model.Note{}).Where("place_id = ?", place.ID).Count(&noteCount)
+	h.DB.WithContext(ctx(c)).Model(&model.Photo{}).Where("place_id = ? AND user_id = ?", place.ID, user.ID).Count(&photoCount)
+	h.DB.WithContext(ctx(c)).Model(&model.Note{}).Where("place_id = ? AND user_id = ?", place.ID, user.ID).Count(&noteCount)
 
 	c.JSON(http.StatusOK, dto.PlaceDetailOut{
 		PlaceOut:   dto.NewPlaceOut(place),
@@ -328,17 +339,17 @@ func (h *Handler) MergePlace(c *gin.Context) {
 		h.fail(c, tx.Error)
 		return
 	}
-	if err := tx.Model(&model.Photo{}).Where("place_id = ?", source.ID).Update("place_id", target.ID).Error; err != nil {
+	if err := tx.Model(&model.Photo{}).Where("place_id = ? AND user_id = ?", source.ID, user.ID).Update("place_id", target.ID).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
 	}
-	if err := tx.Model(&model.Note{}).Where("place_id = ?", source.ID).Update("place_id", target.ID).Error; err != nil {
+	if err := tx.Model(&model.Note{}).Where("place_id = ? AND user_id = ?", source.ID, user.ID).Update("place_id", target.ID).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
 	}
-	if err := tx.Where("id = ?", source.ID).Delete(&model.Place{}).Error; err != nil {
+	if err := tx.Where("id = ? AND user_id = ?", source.ID, user.ID).Delete(&model.Place{}).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
@@ -372,6 +383,24 @@ func (h *Handler) ownedPlace(c *gin.Context, userID uuid.UUID) (*model.Place, bo
 		return nil, false
 	}
 	return &place, true
+}
+
+// requireOwnedPlace 校验请求体里给出的地点属于当前用户；失败时已写出统一错误响应。
+//
+// 客户端可以任意填写 place_id，凡是「把某条记录挂到某个地点下」的写操作，
+// 都必须先过这一关——正常路径下这能拦住跨租户写入，事务内还会再兜一层。
+func (h *Handler) requireOwnedPlace(c *gin.Context, userID, placeID uuid.UUID) bool {
+	var place model.Place
+	err := h.DB.WithContext(ctx(c)).First(&place, "id = ? AND user_id = ?", placeID, userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		h.fail(c, apperr.NotFound("place_not_found", "目标地点不存在"))
+		return false
+	}
+	if err != nil {
+		h.fail(c, err)
+		return false
+	}
+	return true
 }
 
 func (h *Handler) photoCounts(c *gin.Context, userID uuid.UUID) (map[uuid.UUID]int64, error) {

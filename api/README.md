@@ -60,7 +60,7 @@ api/
 │   ├── storage/           S3 兼容对象存储与预签名
 │   ├── session/           会话存储（Redis / Postgres）
 │   ├── service/           业务逻辑：照片自动聚类
-│   ├── middleware/        CORS 与 CSRF
+│   ├── middleware/        CORS、CSRF 与请求体上限
 │   └── handler/           HTTP 层：路由、鉴权、各资源处理器
 └── go.mod / go.sum
 ```
@@ -81,7 +81,7 @@ api/
 | [`internal/storage/`](internal/storage/README.md) | 预签名上传与读取 |
 | [`internal/session/`](internal/session/README.md) | 会话存储两种实现 |
 | [`internal/service/`](internal/service/README.md) | 照片自动聚类 |
-| [`internal/middleware/`](internal/middleware/README.md) | CORS 与 CSRF |
+| [`internal/middleware/`](internal/middleware/README.md) | CORS、CSRF 与请求体上限 |
 | [`internal/handler/`](internal/handler/README.md) | 路由与各资源处理器 |
 
 ---
@@ -139,6 +139,20 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 ```json
 { "code": "photo_not_found", "message": "照片不存在", "detail": {} }
 ```
+
+### 请求边界
+
+| 边界 | 值 | 超限行为 |
+|---|---|---|
+| 请求体大小 | `/api/v1` 下 **1 MiB**（`middleware.LimitBody`） | **413** `payload_too_large`，`detail.limit_bytes` 给上限 |
+| 密码长度 | **≤ 72 字节**（bcrypt 硬上限，约 24 个汉字） | 注册 **400** `validation_error`；登录 **401** `invalid_credentials` |
+| 就绪探针 `checks` | 每项只有 `"ok"` / `"error"` | 真实错误只进服务端 slog 日志，**不回显**给未认证请求 |
+
+第二条不是产品偏好而是密码算法的硬约束：bcrypt 拒绝超过 72 字节的输入，
+若不提前拦截，注册会直接 500。`dto` 里的 `max=200` 按字符数校验，不能替代字节级检查。
+
+第三条的考虑：`/healthz/ready` 是未认证入口，错误原文里常带主机名、端口、bucket 名等
+内部信息；对外只给 `ok`/`error`，排障看服务端 `slog.Warn`。
 
 ---
 
@@ -253,7 +267,7 @@ GET    /api/v1/geo/search?q=            地名搜索
 
 | 现象 | 原因与处理 |
 |---|---|
-| `/healthz/ready` 返回 503 | 逐项看 `checks`：`database` / `redis` / `storage` 哪个不是 ok |
+| `/healthz/ready` 返回 503 | 逐项看 `checks`：`database` / `redis` / `storage` 哪个不是 ok。探针只回 `ok`/`error`，具体错误在服务端 `slog.Warn` 日志里（不回显给未认证请求） |
 | 连接被拒，但 `podman ps` 显示容器 Up | **Windows 保留端口段**吞掉了映射。执行 `netsh interface ipv4 show excludedportrange protocol=tcp` 查看，换个主机端口重新创建容器（本项目 Redis 就因此从 6379 换到了 16379） |
 | `cannot parse "postgresql+asyncpg://..."` | 连接串前缀不被 pgx 识别；已在 `internal/config` 里归一化，若仍报错请检查是否绕过了它 |
 | `dial tcp [::1]:6379` | `localhost` 被解析成 IPv6；配置层已归一化为 127.0.0.1 |

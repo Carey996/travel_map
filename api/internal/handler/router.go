@@ -6,6 +6,13 @@ import (
 	"github.com/Carey996/travel_map/api/internal/middleware"
 )
 
+// maxRequestBodyBytes 是 /api/v1 请求体的硬上限（1 MiB）。
+//
+// 后端从不接收图片字节流（图片走预签名直传对象存储），业务请求都是元数据、
+// 坐标与 slug 之类的小 JSON，1 MiB 已经宽裕；设上限是为了防止超大 body
+// 在反序列化时把内存打满。
+const maxRequestBodyBytes = 1 << 20
+
 // Router 组装全部路由与中间件。
 //
 // 中间件顺序很关键：CORS 必须在 CSRF 之外，跨站请求才能在预检阶段就被拒绝，
@@ -26,6 +33,9 @@ func (h *Handler) Router() *gin.Engine {
 	r.GET("/healthz/ready", h.Readiness)
 
 	v1 := r.Group("/api/v1")
+	// 必须在创建子分组之前挂上：gin 的 Group() 在创建时复制父级 handlers，
+	// 之后再 Use 不会回溯到已创建的子分组。
+	v1.Use(middleware.LimitBody(maxRequestBodyBytes))
 
 	auth := v1.Group("/auth")
 	{

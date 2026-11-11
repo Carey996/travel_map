@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/Carey996/travel_map/api/internal/apperr"
 	"github.com/Carey996/travel_map/api/internal/geo"
 	"github.com/Carey996/travel_map/api/internal/model"
 )
@@ -52,9 +54,11 @@ func AssignPhoto(ctx context.Context, gdb *gorm.DB, userID uuid.UUID, photo *mod
 
 	if photo.PlaceID != nil {
 		var place model.Place
-		if err := gdb.WithContext(ctx).First(&place, "id = ?", *photo.PlaceID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return nil, nil
+		// 防御性校验：handler 已经确认过归属，这里再兜一层——
+		// 任何调用方都不能凭一个 place_id 把照片挂到别人的地点上，并改写对方的日期范围。
+		if err := gdb.WithContext(ctx).First(&place, "id = ? AND user_id = ?", *photo.PlaceID, userID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, apperr.NotFound("place_not_found", "照片归属的地点不存在或不属于当前用户")
 			}
 			return nil, fmt.Errorf("查询地点失败: %w", err)
 		}

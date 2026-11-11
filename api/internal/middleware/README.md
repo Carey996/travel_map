@@ -1,4 +1,4 @@
-# `api/internal/middleware` · CORS 与 CSRF
+# `api/internal/middleware` · CORS、CSRF 与请求体上限
 
 > 知识树：[项目根](../../../README.md) › [`api`](../../README.md) › [`internal`](../README.md) › **`middleware`**
 
@@ -6,8 +6,9 @@
 |---|---|---|
 | `cors.go` | 带凭据的跨域白名单 | `CORS()` |
 | `csrf.go` | 要求变更类请求携带自定义头 | `CSRF()` |
+| `bodylimit.go` | 请求体字节上限 | `LimitBody()` |
 
-只依赖 Gin，与业务无关。
+只依赖 Gin 与标准库，与业务无关。
 
 ## 为什么需要 CSRF 防护
 
@@ -42,7 +43,21 @@ r.Use(middleware.CSRF(...))
 它们不属于版本化业务 API，且都是 GET（本就在安全方法内），豁免是为了让
 未来可能加的就绪检查保持简单。
 
+## 请求体上限
+
+`LimitBody(maxBytes)` 用标准库的 `http.MaxBytesReader` 把 `c.Request.Body` 包一层：
+读取超过 `maxBytes` 时返回 `*http.MaxBytesError`。它**自己不写响应**——
+翻译成 413 `payload_too_large` 的是 `handler.bind()`，这样错误形状仍由 HTTP 层统一决定。
+
+装配在 `handler/router.go` 的 `/api/v1` 分组上（1 MiB），并且**必须在创建子分组之前**
+`v1.Use(...)`：gin 的 `Group()` 在创建时复制父级 handlers，之后再 `Use` 不会回溯到
+已创建的子分组。探针挂在根路径、不在该分组上，不受影响。
+
+后端不接收图片字节流（图片走预签名直传对象存储），业务请求都是元数据/坐标之类的小 JSON，
+1 MiB 已经宽裕；上限存在的意义是防止超大 body 在反序列化时打满内存。
+
 ## 相关
 
 - 上级：[`internal/`](../README.md)
 - 装配处：[`handler/router.go`](../handler/README.md)
+- 413 映射：[`handler/handler.go` 的 `bind()`](../handler/README.md)

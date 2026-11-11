@@ -137,13 +137,13 @@ func (h *Handler) DeleteTrip(c *gin.Context) {
 		h.fail(c, tx.Error)
 		return
 	}
-	if err := tx.Model(&model.Place{}).Where("trip_id = ?", trip.ID).
+	if err := tx.Model(&model.Place{}).Where("user_id = ? AND trip_id = ?", user.ID, trip.ID).
 		Update("trip_id", nil).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
 	}
-	if err := tx.Where("id = ?", trip.ID).Delete(&model.Trip{}).Error; err != nil {
+	if err := tx.Where("id = ? AND user_id = ?", trip.ID, user.ID).Delete(&model.Trip{}).Error; err != nil {
 		tx.Rollback()
 		h.fail(c, err)
 		return
@@ -209,12 +209,13 @@ func (h *Handler) RemoveTripPlace(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 // tripSlug 生成稳定且唯一的行程标识（中文标题无法直接 slug 化）。
+//
+// 必须用**完整**的 uuid：UUIDv7 的高位是毫秒时间戳，只取前 12 位相当于
+// 「同一天创建的行程几乎只有 2 位随机性」，同一毫秒建两个旅行就会撞
+// slug 的唯一索引（表现为 500）。32 位 hex + "trip-" 前缀共 37 字符，
+// 远在模型 size:200 之内。
 func tripSlug(id uuid.UUID) string {
-	compact := strings.ToLower(strings.ReplaceAll(id.String(), "-", ""))
-	if len(compact) > 12 {
-		compact = compact[:12]
-	}
-	return "trip-" + compact
+	return "trip-" + strings.ReplaceAll(id.String(), "-", "")
 }
 
 func (h *Handler) ownedTrip(c *gin.Context, userID uuid.UUID) (*model.Trip, bool) {

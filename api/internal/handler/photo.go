@@ -42,6 +42,60 @@ func fileExtension(filename, contentType string) string {
 	return ".jpg"
 }
 
+// validStorageKey 校验客户端提交的对象键确实属于当前用户。
+//
+// 上传 URL 由服务端签发，键格式固定为 "u/<user.UUID>/<hash>.<ext>"（见 CreateUploadURL）。
+// 登记照片时浏览器会把键原样传回来：若不校验，用户 A 只要提交用户 B 的对象键，
+// 就能在响应的预签名直链里拿到 B 的照片——对象存储层的租户隔离会完全失效。
+func validStorageKey(userID uuid.UUID, key string) bool {
+	if userID == uuid.Nil || key == "" {
+		return false
+	}
+	// 对象键由服务端生成，绝不应该出现路径语义；出现即视为恶意或损坏数据
+	if strings.Contains(key, "..") || strings.Contains(key, `\`) || strings.ContainsRune(key, 0) {
+		return false
+	}
+	prefix := "u/" + userID.String() + "/"
+	if !strings.HasPrefix(key, prefix) {
+		return false
+	}
+	rest := strings.TrimPrefix(key, prefix)
+	return rest != "" && !strings.HasPrefix(rest, "/")
+}
+
+// validContentHash 校验客户端提交的内容哈希可以安全地拼进对象键。
+//
+// content_hash 会被直接拼成 "u/<uid>/<content_hash><ext>"，若允许 "/"、".."，
+// 用户就能让服务端为任意键签发 PUT。前端用的是 SHA-256 十六进制串，这里按此收紧。
+func validContentHash(hash string) bool {
+	if len(hash) < 8 || len(hash) > 64 {
+		return false
+	}
+	for _, r := range hash {
+		isDigit := r >= '0' && r <= '9'
+		isLowerHex := r >= 'a' && r <= 'f'
+		isUpperHex := r >= 'A' && r <= 'F'
+		if !isDigit && !isLowerHex && !isUpperHex {
+			return false
+		}
+	}
+	return true
+}
+
+// normalizedKey 把「传了空串」归一成「没传」，避免把空对象键写进库。
+func normalizedKey(key *string) *string {
+	if key == nil || strings.TrimSpace(*key) == "" {
+		return nil
+	}
+	return key
+}
+
+// invalidStorageKeyError 统一的对象键校验失败响应。
+func invalidStorageKeyError(field string) *apperr.Error {
+	return apperr.BadRequest("invalid_storage_key", "对象键不属于当前用户").
+		WithDetail(map[string]any{"field": field})
+}
+
 // CreateUploadURL 签发直传用的预签名 URL，并对同一用户的重复上传短路。
 func (h *Handler) CreateUploadURL(c *gin.Context) {
 	user := h.currentUser(c)
@@ -50,6 +104,11 @@ func (h *Handler) CreateUploadURL(c *gin.Context) {
 	}
 	var req dto.UploadURLRequest
 	if !h.bind(c, &req) {
+		return
+	}
+	// content_hash 会进入对象键，必须先确认它不含路径分隔符等危险字符
+	if !validContentHash(req.ContentHash) {
+		h.fail(c, apperr.BadRequest("invalid_content_hash", "content_hash 必须是 8-64 位十六进制字符串"))
 		return
 	}
 
@@ -146,12 +205,33 @@ func (h *Handler) CreatePhoto(c *gin.Context) {
 		return
 	}
 
+	// 请求体里的 place_id 与对象键都来自客户端：入库前必须确认它们属于当前用户。
+	// 少了这一步，知道他人地点 UUID 就能把照片挂进去并改写对方的 date_from/date_to；
+	// 提交他人对象键则能在响应里拿到对方的预签名直链。
+	if req.PlaceID != nil && !h.requireOwnedPlace(c, user.ID, *req.PlaceID) {
+		return
+	}
+	previewKey := normalizedKey(req.PreviewKey)
+	thumbKey := normalizedKey(req.ThumbKey)
+	if !validStorageKey(user.ID, req.StorageKey) {
+		h.fail(c, invalidStorageKeyError("storage_key"))
+		return
+	}
+	if previewKey != nil && !validStorageKey(user.ID, *previewKey) {
+		h.fail(c, invalidStorageKeyError("preview_key"))
+		return
+	}
+	if thumbKey != nil && !validStorageKey(user.ID, *thumbKey) {
+		h.fail(c, invalidStorageKeyError("thumb_key"))
+		return
+	}
+
 	photo := model.Photo{
 		UserID:       user.ID,
 		PlaceID:      req.PlaceID,
 		StorageKey:   req.StorageKey,
-		PreviewKey:   req.PreviewKey,
-		ThumbKey:     req.ThumbKey,
+		PreviewKey:   previewKey,
+		ThumbKey:     thumbKey,
 		OriginalName: req.OriginalName,
 		Mime:         orDefault(req.Mime, "image/jpeg"),
 		Bytes:        req.Bytes,
@@ -195,7 +275,7 @@ func (h *Handler) CreatePhoto(c *gin.Context) {
 	// 而 AssignPhoto 恰好已经把它设成同一个值——于是唯一需要写库的那次被跳过了，
 	// 表现为照片在地图上永远挂不到地点下。
 	if place != nil {
-		if err := tx.Model(&model.Photo{}).Where("id = ?", photo.ID).
+		if err := tx.Model(&model.Photo{}).Where("id = ? AND user_id = ?", photo.ID, user.ID).
 			Update("place_id", place.ID).Error; err != nil {
 			tx.Rollback()
 			h.fail(c, err)
@@ -320,9 +400,8 @@ func (h *Handler) UpdatePhoto(c *gin.Context) {
 	if req.ClearPlace {
 		photo.PlaceID = nil
 	} else if req.PlaceID != nil {
-		var place model.Place
-		if err := h.DB.WithContext(ctx(c)).First(&place, "id = ? AND user_id = ?", *req.PlaceID, user.ID).Error; err != nil {
-			h.fail(c, apperr.NotFound("place_not_found", "目标地点不存在"))
+		// PATCH 也能改归属，同样不能信任客户端给的 place_id
+		if !h.requireOwnedPlace(c, user.ID, *req.PlaceID) {
 			return
 		}
 		photo.PlaceID = req.PlaceID
@@ -358,7 +437,7 @@ func (h *Handler) UpdatePhoto(c *gin.Context) {
 			return
 		}
 		if place != nil {
-			if err := tx.Model(&model.Photo{}).Where("id = ?", photo.ID).Update("place_id", place.ID).Error; err != nil {
+			if err := tx.Model(&model.Photo{}).Where("id = ? AND user_id = ?", photo.ID, user.ID).Update("place_id", place.ID).Error; err != nil {
 				tx.Rollback()
 				h.fail(c, err)
 				return
@@ -398,7 +477,7 @@ func (h *Handler) DeletePhoto(c *gin.Context) {
 		keys = append(keys, *photo.ThumbKey)
 	}
 
-	if err := h.DB.WithContext(ctx(c)).Where("id = ?", photo.ID).Delete(&model.Photo{}).Error; err != nil {
+	if err := h.DB.WithContext(ctx(c)).Where("id = ? AND user_id = ?", photo.ID, user.ID).Delete(&model.Photo{}).Error; err != nil {
 		h.fail(c, err)
 		return
 	}

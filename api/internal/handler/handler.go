@@ -5,6 +5,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -55,9 +57,21 @@ func (h *Handler) fail(c *gin.Context, err error) {
 	c.JSON(http.StatusInternalServerError, apperr.Internal())
 }
 
-// bind 解析并校验请求体；失败时直接写出 422 并返回 false。
+// bind 解析并校验请求体；失败时直接写出错误响应并返回 false。
+//
+// 请求体超限由 middleware.LimitBody 装的 http.MaxBytesReader 在读取时发现，
+// 必须映射成 413：否则调用方只会看到一个笼统的 422 校验失败，前端无法区分
+// 「格式不对」和「body 太大」。
 func (h *Handler) bind(c *gin.Context, target any) bool {
 	if err := c.ShouldBindJSON(target); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge,
+				apperr.New(http.StatusRequestEntityTooLarge, "payload_too_large",
+					fmt.Sprintf("请求体过大（上限 %d 字节）", tooLarge.Limit)).
+					WithDetail(map[string]any{"limit_bytes": tooLarge.Limit}))
+			return false
+		}
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    "validation_error",
 			"message": "请求参数校验失败",
@@ -91,8 +105,16 @@ func (h *Handler) currentUser(c *gin.Context) *model.User {
 	}
 
 	var user model.User
-	if err := h.DB.WithContext(ctx(c)).First(&user, "id = ?", userID).Error; err != nil {
+	err = h.DB.WithContext(ctx(c)).First(&user, "id = ?", userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// 会话指向的用户已不存在：这才是「登录失效」。
 		h.fail(c, apperr.Unauthorized("session_expired", "登录已失效，请重新登录"))
+		return nil
+	}
+	if err != nil {
+		// 数据库抖动不是「未登录」：返回 500 并记日志，不要把用户踢下线、
+		// 也不要把真实故障掩盖成一次普通的会话过期。
+		h.fail(c, err)
 		return nil
 	}
 	if !user.IsActive {

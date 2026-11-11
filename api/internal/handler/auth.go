@@ -18,10 +18,30 @@ import (
 // 用于「邮箱不存在时也做一次哈希比对」的假哈希，避免通过响应时间枚举账号。
 const dummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
+// maxPasswordBytes 是 bcrypt 的硬上限：超过 72 字节时
+// GenerateFromPassword / CompareHashAndPassword 会直接返回错误而不是比对，
+// 因此必须在进入 bcrypt 之前拦掉，否则注册路径会变成 500。
+const maxPasswordBytes = 72
+
+// passwordTooLong 报告密码是否超过 bcrypt 的 72 字节上限。
+//
+// 按「字节」而非「字符」计算：一个汉字占 3 字节，72 字节约等于 24 个汉字。
+// 抽成纯函数便于单元测试，也避免各处各写一套判断。
+func passwordTooLong(p string) bool {
+	return len([]byte(p)) > maxPasswordBytes
+}
+
 // Register 注册并自动登录。
 func (h *Handler) Register(c *gin.Context) {
 	var req dto.RegisterRequest
 	if !h.bind(c, &req) {
+		return
+	}
+	// dto 里 max=200 只按字符数校验，拦不住 73+ 字节的 UTF-8 密码；
+	// bcrypt 会拒绝这种输入，若继续往下走就会变成 500 而不是 400。
+	if passwordTooLong(req.Password) {
+		h.fail(c, apperr.BadRequest("validation_error",
+			"密码过长（最多 72 字节，约 24 个汉字）"))
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
@@ -69,6 +89,14 @@ func (h *Handler) Register(c *gin.Context) {
 func (h *Handler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if !h.bind(c, &req) {
+		return
+	}
+	// 超长密码与任何已存哈希都不可能匹配（注册路径同样会拒绝）。
+	// 这里仍然付一次 bcrypt 比对的成本（用截断到上限的密码喂给假哈希），
+	// 否则「密码超长」会比「密码错误」快一个数量级，形成可观测的时序差异。
+	if passwordTooLong(req.Password) {
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(req.Password)[:maxPasswordBytes])
+		h.fail(c, apperr.Unauthorized("invalid_credentials", "邮箱或密码不正确"))
 		return
 	}
 	email := strings.ToLower(req.Email)
