@@ -483,7 +483,7 @@ function renderPhotoDots(): void {
   // 屏幕上已经占用的位置：先放大头针（它就代表「这里有照片」），再放照片点。
   // 同一处的照片在地图上会完全重合，叠成一坨看起来就像「两张一样的图」，
   // 所以同一格只保留一个标记，其余照片在侧栏/抽屉里照样能点开。
-  const DOT_MIN_GAP = 22;
+  const DOT_MIN_GAP = 40;
   const taken: L.Point[] = [];
   if (map) {
     for (const place of props.places) {
