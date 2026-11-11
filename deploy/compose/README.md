@@ -165,6 +165,33 @@ docker compose up -d --build
 
 前端静态资源带 30 天缓存、`index.html` 不缓存，刷新即可看到新版本。
 
+## 安全响应头（已内置）
+
+两个容器分工下发安全头，不必再手动加：
+
+| 层 | 响应头 | 说明 |
+|---|---|---|
+| web 的 nginx | `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Content-Security-Policy` | 随页面与 `/api` 响应一起返回，见 `deploy/nginx/default.conf.template` |
+| Caddy | `Strict-Transport-Security`（HSTS） | 只在 HTTPS 成立时有意义，因此放在 Caddy 层 |
+
+上线后确认一遍：
+
+```bash
+curl -sI https://站点域名 | grep -iE 'strict-transport|x-content-type|x-frame|referrer|permissions|content-security'
+curl -sI https://对象存储域名 | grep -i strict-transport
+```
+
+两条前提，缺一不可：
+
+1. **必须走 Caddy 的 443**。两件事都依赖 HTTPS：HSTS 只对 HTTPS 生效；
+   `COOKIE_SECURE=true` 的会话 Cookie 在纯 HTTP 下会被浏览器直接丢弃，登录态根本存不住。
+2. **CSP 是按当前前端写的**（同源脚本、高德瓦片、Canvas 缩略图、预签名直传）。
+   以后如果引入新的第三方源，浏览器 Console 会报被 CSP 拦截的 URL，按提示追加到
+   `default.conf.template` 的 `img-src` / `connect-src` 即可；改完重建 web 镜像生效。
+
+> ⚠️ 裸 IP + 纯 HTTP 的临时部署（不经过 Caddy）拿不到 HSTS，且只能把
+> `COOKIE_SECURE` 关掉才能登录——那是调试形态，不要当成正式配置。
+
 ## 三个必须知道的坑
 
 **1. 对象存储的「内外两套地址 + 两个 TLS 开关」。**

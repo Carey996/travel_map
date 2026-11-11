@@ -10,6 +10,9 @@
 
 {$SITE_DOMAIN} {
 	encode zstd gzip
+	# HSTS 只有在这种「Caddy 自动签发证书 + 全站 HTTPS」的部署里才成立；
+	# 其余安全头（CSP / nosniff / XFO …）由 web 容器的 nginx 统一下发。
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	reverse_proxy web:8080 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
@@ -18,6 +21,9 @@
 
 {$MINIO_DOMAIN} {
 	encode zstd gzip
+	# 图片域同样只走 HTTPS，加 HSTS 免得首次预签名直传被降级；
+	# 注意该域只服务对象存储，不加载页面，所以不需要 CSP。
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	reverse_proxy minio:9000 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}

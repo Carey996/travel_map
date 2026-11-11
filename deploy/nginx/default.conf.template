@@ -17,6 +17,29 @@ server {
     listen 8080;
     server_name _;
 
+    # 不在响应头里暴露 nginx 版本
+    server_tokens off;
+
+    # ---------------------------------------------------------------------
+    # 安全响应头
+    #
+    # 注意 nginx 的继承规则：子块（location）里只要出现一条 add_header，
+    # 就不再继承 server 级的 add_header。因此下面的 location 一律不用
+    # add_header（缓存改用 expires 指令），安全头统一由这里下发，避免漏头。
+    # ---------------------------------------------------------------------
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    # CSP 各条的理由：
+    #   script-src 'self'        构建产物只有同源外链脚本，没有内联 <script>
+    #   style-src  'unsafe-inline' Element Plus / Leaflet 会写行内 style 属性
+    #   img-src    data: blob:    浏览器端 Canvas 生成的缩略图；https 为高德瓦片与图床
+    #   img-src    http:          单 Pod / 本地验证时对象存储是 http 明文地址（HTTPS 下会被混合内容拦截）
+    #   connect-src https: http:  预签名直传直取、SSE 之类的跨源请求
+    # 若日后加了新的外部源，浏览器 Console 会给出被拦截的 URL，按提示追加即可。
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self' https: http:; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
+
     root /usr/share/nginx/html;
     index index.html;
 
@@ -41,14 +64,15 @@ server {
         proxy_set_header Host $host;
     }
 
-    # 静态资源长缓存；index.html 不缓存，保证发版即时生效
+    # 静态资源长缓存；index.html 不缓存，保证发版即时生效。
+    # 这里只写 expires（不写 add_header）：既避免 Cache-Control 出现两条，
+    # 也保住 server 级安全头的继承——hashed 文件名已经足够，不再叠加 immutable。
     location ~* \.(?:js|css|woff2?|png|jpg|jpeg|svg|webp|ico)$ {
         expires 30d;
-        add_header Cache-Control "public, immutable";
     }
 
     location = /index.html {
-        add_header Cache-Control "no-cache";
+        expires -1;
     }
 
     gzip on;
