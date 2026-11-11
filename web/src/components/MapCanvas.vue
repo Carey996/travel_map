@@ -457,14 +457,33 @@ function renderTrips(): void {
   }
 }
 
+/**
+ * 每个地点被当作封面（大头针圆图）的那张照片。
+ * 选取规则必须和 renderPlaces 里一致：props.photos 里该地点的第一张。
+ */
+function coverPhotoIds(): Set<string> {
+  const seenPlaces = new Set<string>();
+  const covers = new Set<string>();
+  for (const photo of props.photos) {
+    if (!photo.place_id || seenPlaces.has(photo.place_id)) continue;
+    seenPlaces.add(photo.place_id);
+    covers.add(photo.id);
+  }
+  return covers;
+}
+
 function renderPhotoDots(): void {
   if (!photoLayer) return;
   photoLayer.clearLayers();
   if (!props.showPhotoDots || zoomLevel.value < PHOTO_DOT_MIN_ZOOM) return;
 
+  // 封面照片已经画在地点大头针里了；再画一个照片点就是「同一张照片叠两层」
+  const covers = coverPhotoIds();
+
   let rendered = 0;
   for (const photo of props.photos) {
     if (photo.lat === null || photo.lng === null) continue;
+    if (covers.has(photo.id)) continue;
     if (rendered >= MAX_PHOTO_DOTS) break;
     rendered += 1;
     const [lat, lng] = toMapCoords(photo.lat, photo.lng, provider.value.crs);

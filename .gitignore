@@ -34,7 +34,8 @@ data/
 *.sqlite3
 *.db
 
-# ---- 编辑器 / 系统 ----
+# ---- 编辑器 / 系统 / 本地缓存 ----
+.dsh/
 .vscode/
 .idea/
 .DS_Store
