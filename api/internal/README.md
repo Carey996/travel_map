@@ -13,7 +13,7 @@ handler/       HTTP 层：路由、鉴权、请求校验、响应序列化
   └─ service/  业务逻辑：照片聚类
        └─ model/ 数据模型
             └─ db/ · config/ · apperr/ · geo/
-middleware/    与业务无关的横切关注点，只依赖 gin
+middleware/    与业务无关的横切关注点；依赖 gin、go-redis 与 apperr（错误契约）
 storage/ session/ geocode/   平级的服务包，互不依赖
 ```
 
@@ -34,7 +34,7 @@ storage/ session/ geocode/   平级的服务包，互不依赖
 | [`storage/`](storage/README.md) | 预签名上传与读取 |
 | [`session/`](session/README.md) | 会话存储两种实现 |
 | [`service/`](service/README.md) | 照片自动聚类与日期范围继承 |
-| [`middleware/`](middleware/README.md) | CORS 与 CSRF |
+| [`middleware/`](middleware/README.md) | CORS、CSRF、请求体上限与认证入口限流 |
 | [`handler/`](handler/README.md) | 路由与各资源处理器 |
 
 ## 相关

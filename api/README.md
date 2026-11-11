@@ -60,7 +60,7 @@ api/
 │   ├── storage/           S3 兼容对象存储与预签名
 │   ├── session/           会话存储（Redis / Postgres）
 │   ├── service/           业务逻辑：照片自动聚类
-│   ├── middleware/        CORS、CSRF 与请求体上限
+│   ├── middleware/        CORS、CSRF、请求体上限与限流
 │   └── handler/           HTTP 层：路由、鉴权、各资源处理器
 └── go.mod / go.sum
 ```
@@ -81,7 +81,7 @@ api/
 | [`internal/storage/`](internal/storage/README.md) | 预签名上传与读取 |
 | [`internal/session/`](internal/session/README.md) | 会话存储两种实现 |
 | [`internal/service/`](internal/service/README.md) | 照片自动聚类 |
-| [`internal/middleware/`](internal/middleware/README.md) | CORS、CSRF 与请求体上限 |
+| [`internal/middleware/`](internal/middleware/README.md) | CORS、CSRF、请求体上限与限流 |
 | [`internal/handler/`](internal/handler/README.md) | 路由与各资源处理器 |
 
 ---
@@ -133,6 +133,8 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 
 中间件按 `r.Use` 的注册顺序执行，所以 **CORS 必须注册在 CSRF 之前**——
 否则跨站请求会先撞上 CSRF 校验，而不是在预检阶段就被拒绝。
+`/api/v1` 分组还挂着请求体上限；登录/注册两条路由额外挂路由级限流（在 handler 之前短路），
+两者都列在下面的「请求边界」里。
 
 **错误契约**：任何失败都返回同一形状，前端只需处理一种结构。
 
@@ -146,12 +148,21 @@ cmd/server            组装：配置 -> 数据库 -> Redis -> 存储 -> 会话 
 |---|---|---|
 | 请求体大小 | `/api/v1` 下 **1 MiB**（`middleware.LimitBody`） | **413** `payload_too_large`，`detail.limit_bytes` 给上限 |
 | 密码长度 | **≤ 72 字节**（bcrypt 硬上限，约 24 个汉字） | 注册 **400** `validation_error`；登录 **401** `invalid_credentials` |
+| 登录限流 | **10 次 / 5 分钟 / IP**（`middleware.RateLimit`） | **429** `rate_limited` + `Retry-After` 头，`detail.retry_after_seconds` 给剩余秒数 |
+| 注册限流 | **5 次 / 1 小时 / IP**（同上） | **429** `rate_limited` + `Retry-After`，同上 |
 | 就绪探针 `checks` | 每项只有 `"ok"` / `"error"` | 真实错误只进服务端 slog 日志，**不回显**给未认证请求 |
 
 第二条不是产品偏好而是密码算法的硬约束：bcrypt 拒绝超过 72 字节的输入，
 若不提前拦截，注册会直接 500。`dto` 里的 `max=200` 按字符数校验，不能替代字节级检查。
 
-第三条的考虑：`/healthz/ready` 是未认证入口，错误原文里常带主机名、端口、bucket 名等
+登录/注册限流由一个**共享 Redis** 的固定窗口计数器实现（key = `tb:ratelimit:<scope>:<window>:<ip>`），
+刻意不用进程内计数——后端要无状态、可多副本，进程内计数在每个实例各算各的会让限额放大 N 倍，
+重启即清零。计数器故障时 **fail-open**（放行 + `slog.Warn`）：限流是附加防线，不能让 Redis
+抖一下就把登录整体打挂。IP 取自 `c.ClientIP()`；`handler/router.go` 只把回环与私有网段
+声明为可信代理，这样 nginx 注入的 `X-Forwarded-For` 会被采信，而公网直连伪造的 XFF 不会。
+实现细节见 [`internal/middleware/README.md`](internal/middleware/README.md)。
+
+最后一条的考虑：`/healthz/ready` 是未认证入口，错误原文里常带主机名、端口、bucket 名等
 内部信息；对外只给 `ok`/`error`，排障看服务端 `slog.Warn`。
 
 ---
