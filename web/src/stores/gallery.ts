@@ -169,6 +169,16 @@ export const useGalleryStore = defineStore('gallery', () => {
     await refresh();
   }
 
+  /**
+   * 把「当前这一张」照片移入指定地点。
+   * 灯箱「设置位置」走这里；侧栏「把未定位照片放到地图上」是批量语义，走 assignUnplacedTo。
+   */
+  async function assignPhotoTo(placeId: string, photoId: string): Promise<void> {
+    await api.assignPhotos(placeId, [photoId]);
+    await refresh();
+  }
+
+  /** 把「全部未定位照片」移入指定地点——只给侧栏的批量入口用 */
   async function assignUnplacedTo(placeId: string): Promise<void> {
     const ids = unplacedPhotos.value.map((photo) => photo.id);
     if (ids.length === 0) return;
@@ -285,6 +295,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     updatePlace,
     deletePlace,
     mergePlace,
+    assignPhotoTo,
     assignUnplacedTo,
     updatePhoto,
     deletePhoto,

@@ -57,6 +57,7 @@
     "placeOnMap": "放到地图上", "takenAt": "拍摄时间", "camera": "相机",
     "exposure": "曝光", "location": "位置", "size": "大小", "locate": "在地图上查看",
     "setLocation": "设置位置", "original": "查看原图", "delete": "删除照片",
+    "confirmDelete": "确定删除这张照片吗？此操作不可撤销。",
     "captionPlaceholder": "为这张照片写一句说明…"
   },
   "health": {

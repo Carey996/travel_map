@@ -32,6 +32,12 @@ const showPhotoDots = ref(true);
 
 /** null = 普通浏览；'place' = 点地图新建地点；'photos' = 点地图给未定位照片选位置 */
 const placing = ref<'place' | 'photos' | null>(null);
+/**
+ * 从灯箱「设置位置」发起时，记录要移动的那一张照片。
+ * null 表示由侧栏「把未定位照片放到地图上」发起的批量模式（移动到全部未定位照片）。
+ * 两种模式共用 placing==='photos'，界面上没有任何区别，只有这里区分范围。
+ */
+const pendingPhotoId = ref<string | null>(null);
 const focus = ref<MapFocus | null>(null);
 const fitToken = ref(0);
 const tripFocus = ref<{ id: string; token: number } | null>(null);
@@ -66,17 +72,46 @@ watch(
   () => auth.isAuthenticated,
   async (authed) => {
     if (authed) await syncAll();
-    else gallery.reset();
+    else {
+      gallery.reset();
+      cancelPlacing();
+    }
   },
 );
+
+/** 退出「点地图选位置」并清掉待定位照片，避免下一次点地图误用旧的照片 id */
+function cancelPlacing(): void {
+  placing.value = null;
+  pendingPhotoId.value = null;
+}
+
+/** 顶栏「新建地点」开关：进入/退出建点模式时都清掉残留的单张照片 */
+function togglePlacePlacing(): void {
+  const wasPlaceMode = placing.value === 'place';
+  cancelPlacing();
+  if (!wasPlaceMode) placing.value = 'place';
+}
+
+/** 侧栏「把未定位照片放到地图上」：批量语义，显式清掉单张兜底 */
+function startBulkPlacing(): void {
+  pendingPhotoId.value = null;
+  placing.value = 'photos';
+  ElMessage.info(t('map.pickPointForPhotos'));
+}
 
 async function onMapClick(lat: number, lng: number): Promise<void> {
   if (placing.value) {
     const mode = placing.value;
-    placing.value = null;
+    const photoId = pendingPhotoId.value;
+    // 先落状态再发请求：成功与失败都不残留，避免下一次点地图重复套用
+    cancelPlacing();
     try {
       const place = await gallery.createPlace({ lat, lng, name: '', kind: 'spot' });
-      if (mode === 'photos') await gallery.assignUnplacedTo(place.id);
+      if (mode === 'photos') {
+        // 从灯箱进来的只移动当前这一张；否则保持「全部未定位照片」的批量语义
+        if (photoId) await gallery.assignPhotoTo(place.id, photoId);
+        else await gallery.assignUnplacedTo(place.id);
+      }
       focus.value = { lat, lng, zoom: 13, token: Date.now() };
     } catch (error) {
       ElMessage.error(error instanceof Error ? error.message : String(error));
@@ -166,8 +201,10 @@ function onPhotoLocated(photo: Photo): void {
   }
 }
 
-function onSetPhotoLocation(): void {
+/** 灯箱「设置位置」：只针对灯箱里这一张照片，不能沿用批量语义 */
+function onSetPhotoLocation(photo: Photo): void {
   gallery.selectedPhotoId = null;
+  pendingPhotoId.value = photo.id;
   placing.value = 'photos';
   ElMessage.info(t('map.pickPointForPhotos'));
 }
@@ -184,7 +221,7 @@ function onSetPhotoLocation(): void {
         v-model:tileProviderId="tileProviderId"
         v-model:showPhotoDots="showPhotoDots"
         :placing="placing === 'place'"
-        @toggle-placing="placing = placing === 'place' ? null : 'place'"
+        @toggle-placing="togglePlacePlacing"
         @fit-all="fitToken += 1"
         @uploaded="syncAll()"
         @focus="(lat: number, lng: number) => (focus = { lat, lng, zoom: 12, token: Date.now() })"
@@ -200,10 +237,7 @@ function onSetPhotoLocation(): void {
             }
           "
           @open-photo="(photo: Photo) => (gallery.selectedPhotoId = photo.id)"
-          @place-unplaced="
-            placing = 'photos';
-            ElMessage.info(t('map.pickPointForPhotos'));
-          "
+          @place-unplaced="startBulkPlacing"
           @add-photos="fileInput?.click()"
           @focus-trip="onFocusTrip"
         />

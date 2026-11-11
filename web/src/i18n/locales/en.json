@@ -57,6 +57,7 @@
     "placeOnMap": "Place on map", "takenAt": "Taken", "camera": "Camera",
     "exposure": "Exposure", "location": "Location", "size": "Size", "locate": "Show on map",
     "setLocation": "Set location", "original": "View original", "delete": "Delete photo",
+    "confirmDelete": "Delete this photo? This cannot be undone.",
     "captionPlaceholder": "Add a caption…"
   },
   "health": {

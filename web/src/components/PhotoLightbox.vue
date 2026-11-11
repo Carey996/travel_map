@@ -38,8 +38,20 @@ function step(delta: number): void {
   if (next) gallery.selectedPhotoId = next.id;
 }
 
+/**
+ * 焦点在输入类元素里时不要劫持方向键——例如在说明输入框里按 ←/→
+ * 只应该移动光标，不应该切到上一张/下一张照片。
+ */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+  return target.isContentEditable;
+}
+
 function onKeydown(event: KeyboardEvent): void {
   if (!visible.value) return;
+  if (isTextEntryTarget(event.target)) return;
   if (event.key === 'ArrowRight') step(1);
   if (event.key === 'ArrowLeft') step(-1);
 }
