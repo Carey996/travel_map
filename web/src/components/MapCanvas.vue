@@ -480,13 +480,32 @@ function renderPhotoDots(): void {
   // 封面照片已经画在地点大头针里了；再画一个照片点就是「同一张照片叠两层」
   const covers = coverPhotoIds();
 
+  // 屏幕上已经占用的位置：先放大头针（它就代表「这里有照片」），再放照片点。
+  // 同一处的照片在地图上会完全重合，叠成一坨看起来就像「两张一样的图」，
+  // 所以同一格只保留一个标记，其余照片在侧栏/抽屉里照样能点开。
+  const DOT_MIN_GAP = 22;
+  const taken: L.Point[] = [];
+  if (map) {
+    for (const place of props.places) {
+      const [pLat, pLng] = toMapCoords(place.lat, place.lng, provider.value.crs);
+      taken.push(map.latLngToContainerPoint([pLat, pLng]));
+    }
+  }
+  const collides = (point: L.Point): boolean =>
+    taken.some((other) => Math.abs(other.x - point.x) < DOT_MIN_GAP && Math.abs(other.y - point.y) < DOT_MIN_GAP);
+
   let rendered = 0;
   for (const photo of props.photos) {
     if (photo.lat === null || photo.lng === null) continue;
     if (covers.has(photo.id)) continue;
     if (rendered >= MAX_PHOTO_DOTS) break;
-    rendered += 1;
     const [lat, lng] = toMapCoords(photo.lat, photo.lng, provider.value.crs);
+    if (map) {
+      const point = map.latLngToContainerPoint([lat, lng]);
+      if (collides(point)) continue;
+      taken.push(point);
+    }
+    rendered += 1;
     const marker = L.marker([lat, lng], {
       icon: photoIcon(photo, photo.id === props.selectedPlaceId),
       keyboard: false,
