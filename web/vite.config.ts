@@ -28,9 +28,11 @@ export default defineConfig({
   },
   server: {
     // 明确绑 IPv4：Windows 上 localhost 常被优先解析成 ::1，只写端口会让
-    // http://127.0.0.1:5173 连不上，而 README 与 CORS 白名单用的都是它。
+    // http://127.0.0.1:5180 连不上，而 README 与 CORS 白名单用的都是它。
+    // 端口刻意不用 Vite 默认的 5173——那台机器上它常被别的项目占着；
+    // strictPort 保证端口被占时直接报错，而不是悄悄换一个让人找错地址。
     host: '127.0.0.1',
-    port: 5173,
+    port: 5180,
     strictPort: true,
     // 开发期把 /api 与探针路径代理到后端，让浏览器视角下前后端同源：
     // 会话 Cookie 因此天然可用，无需处理跨站 Cookie 的诸多限制。

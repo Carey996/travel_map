@@ -17,7 +17,7 @@
 
 ```powershell
 npm install
-npm run dev        # http://127.0.0.1:5173
+npm run dev        # http://127.0.0.1:5180
 ```
 
 后端需要同时运行（见 [`../api/README.md`](../api/README.md)）；依赖容器、后端、前端
@@ -25,7 +25,7 @@ npm run dev        # http://127.0.0.1:5173
 
 | 命令 | 作用 |
 |---|---|
-| `npm run dev` | 开发服务器，固定绑 `127.0.0.1:5173`；`/api` 与 `/healthz` 代理到 `127.0.0.1:8000` |
+| `npm run dev` | 开发服务器，固定绑 `127.0.0.1:5180`（不用 5173，避免和别的项目撞车）；`/api` 与 `/healthz` 代理到 `127.0.0.1:8000` |
 | `npm run build` | 类型检查（vue-tsc）后生产构建到 `dist/` |
 | `npm run typecheck` | 只做类型检查 |
 | `npm run preview` | 预览生产构建产物 |

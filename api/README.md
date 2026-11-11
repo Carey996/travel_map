@@ -246,7 +246,7 @@ GET    /api/v1/geo/search?q=            地名搜索
 | `REDIS_URL` | `redis://127.0.0.1:16379/0` | **注意不是 6379**，见下方排错 |
 | `SESSION_BACKEND` | `redis` | 改成 `db` 即可零额外组件运行 |
 | `COOKIE_SECURE` | `false` | **生产（HTTPS）必须设为 true** |
-| `CORS_ORIGINS` | `http://localhost:5173,...` | 逗号分隔白名单 |
+| `CORS_ORIGINS` | `http://localhost:5180,...` | 逗号分隔白名单 |
 | `S3_ENDPOINT_URL` | `http://127.0.0.1:9000` | 后端调用地址 |
 | `S3_PUBLIC_ENDPOINT_URL` | 空 | 浏览器直传地址；部署到远端时必填 |
 | `GEOCODE_PROVIDER` | `photon` | 或 `nominatim` |

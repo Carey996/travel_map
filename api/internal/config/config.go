@@ -112,7 +112,7 @@ func Load() (*Config, error) {
 		CSRFHeaderName:    env("CSRF_HEADER_NAME", "x-requested-with"),
 		CSRFHeaderValue:   env("CSRF_HEADER_VALUE", "XMLHttpRequest"),
 
-		CORSOrigins: envList("CORS_ORIGINS", []string{"http://localhost:5173", "http://127.0.0.1:5173"}),
+		CORSOrigins: envList("CORS_ORIGINS", []string{"http://localhost:5180", "http://127.0.0.1:5180"}),
 
 		S3Endpoint:       env("S3_ENDPOINT_URL", "http://localhost:9000"),
 		S3PublicEndpoint: env("S3_PUBLIC_ENDPOINT_URL", ""),

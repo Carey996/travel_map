@@ -193,7 +193,7 @@ MinIO 的 bucket 由后端启动时自动创建；**建表也不需要单独一�
 cd api && go run ./cmd/server        # http://127.0.0.1:8000
 
 # 终端 2：前端 Vite
-cd web && npm run dev                # http://127.0.0.1:5173
+cd web && npm run dev                # http://127.0.0.1:5180
 ```
 
 **方式 B · 一条命令后台起**，日志与 PID 落在 `.logs/`（已在 .gitignore 里）：
@@ -204,14 +204,14 @@ mkdir -p .logs
 ( cd api && go build -o "bin/server$(go env GOEXE)" ./cmd/server && exec "./bin/server$(go env GOEXE)" ) \
   >.logs/api.log 2>&1 & echo $! >.logs/api.pid
 # 前端直接跑 vite 的可执行入口而不是 npm run dev：npm 会把 vite 当子进程启动，
-# 记下的是 npm 的 PID，kill 掉它之后 vite 仍然占着 5173
+# 记下的是 npm 的 PID，kill 掉它之后 vite 仍然占着 5180
 ( cd web && exec node ./node_modules/vite/bin/vite.js ) >.logs/web.log 2>&1 & echo $! >.logs/web.pid
 
 # 停止
 kill "$(cat .logs/api.pid)" "$(cat .logs/web.pid)" 2>/dev/null
 ```
 
-打开 <http://127.0.0.1:5173>，注册一个账号即可开始。
+打开 <http://127.0.0.1:5180>，注册一个账号即可开始。
 存活探针 <http://127.0.0.1:8000/healthz>，就绪探针 <http://127.0.0.1:8000/healthz/ready>
 （会逐项报告 Postgres / Redis / 对象存储哪个不通）。
 后端**没有 OpenAPI 文档页**，路由全表见下方「API 一览」。

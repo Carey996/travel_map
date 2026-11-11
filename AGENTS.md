@@ -77,7 +77,7 @@ until podman exec travelblog-postgres pg_isready -U travelblog -d travelblog >/d
 
 # 单独跑后端 / 前端
 cd api && go run ./cmd/server          # http://127.0.0.1:8000
-cd web && npm run dev                  # http://127.0.0.1:5173
+cd web && npm run dev                  # http://127.0.0.1:5180
 
 # 类型检查与构建
 cd web && npx vue-tsc --noEmit && npx vite build
