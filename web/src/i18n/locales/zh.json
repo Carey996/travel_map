@@ -23,7 +23,7 @@
   "map": {
     "searchPlaceholder": "搜索城市或地点…", "newPlace": "新建地点",
     "clickToPlace": "点地图选位置", "placeModeHint": "点击地图上的位置来新建一个地点",
-    "layers": "底图", "dots": "照片点", "showPhotoDots": "在高缩放级别显示单张照片的位置",
+    "layers": "底图",
     "fitAll": "全览", "pickPointForPhotos": "请在地图上点击照片所在的位置",
     "emptyTitle": "还没有任何地点", "emptyBody": "上传带 GPS 的照片会自动在地图上生成地点，也可以直接点地图新建。",
     "outsideCoverage": "已在境外：自动切换到全球底图（Esri）"

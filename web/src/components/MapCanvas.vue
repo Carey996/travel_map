@@ -30,7 +30,6 @@ const props = defineProps<{
   trips: Trip[];
   selectedPlaceId: string | null;
   tileProviderId: string;
-  showPhotoDots: boolean;
   placingMode: boolean;
   focus: MapFocus | null;
   fitToken: number;
@@ -41,14 +40,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'select-place', id: string | null): void;
   (event: 'map-click', lat: number, lng: number): void;
-  (event: 'photo-click', photo: Photo): void;
   (event: 'focus-trip', tripId: string): void;
 }>();
 
 const { t } = useI18n();
 
-const PHOTO_DOT_MIN_ZOOM = 14;
-const MAX_PHOTO_DOTS = 400;
+// 地图只画「地点」一种标记：单张照片不单独上图，否则同一张照片会和地点大头针叠在一起。
+// 看单张照片走侧栏时间线 / 地点抽屉 / 灯箱。
 
 const container = ref<HTMLDivElement | null>(null);
 const zoomLevel = ref(4);
@@ -58,7 +56,6 @@ let map: L.Map | null = null;
 let tileLayer: L.TileLayer | null = null;
 let tripLayer: L.LayerGroup | null = null;
 let placeLayer: L.LayerGroup | null = null;
-let photoLayer: L.LayerGroup | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
 /** 视图跑到中国大陆以外时自动换用的底图（高德只覆盖大陆，境外会是一片空白） */
@@ -300,16 +297,6 @@ function collectSamples(cluster: Cluster, map: Map<string, string[]>): string[] 
   return out;
 }
 
-function photoIcon(photo: Photo, selected: boolean): L.DivIcon {
-  return L.divIcon({
-    className: 'photo-dot-wrap',
-    html:
-      '<div class="photo-dot' + (selected ? ' is-selected' : '') + '">' +
-      '<img src="' + photo.thumb_url + '" alt="" loading="lazy" /></div>',
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-  });
-}
 
 // ---------------------------------------------------------------------------
 // 图层渲染
@@ -457,66 +444,6 @@ function renderTrips(): void {
   }
 }
 
-/**
- * 每个地点被当作封面（大头针圆图）的那张照片。
- * 选取规则必须和 renderPlaces 里一致：props.photos 里该地点的第一张。
- */
-function coverPhotoIds(): Set<string> {
-  const seenPlaces = new Set<string>();
-  const covers = new Set<string>();
-  for (const photo of props.photos) {
-    if (!photo.place_id || seenPlaces.has(photo.place_id)) continue;
-    seenPlaces.add(photo.place_id);
-    covers.add(photo.id);
-  }
-  return covers;
-}
-
-function renderPhotoDots(): void {
-  if (!photoLayer) return;
-  photoLayer.clearLayers();
-  if (!props.showPhotoDots || zoomLevel.value < PHOTO_DOT_MIN_ZOOM) return;
-
-  // 封面照片已经画在地点大头针里了；再画一个照片点就是「同一张照片叠两层」
-  const covers = coverPhotoIds();
-
-  // 屏幕上已经占用的位置：先放大头针（它就代表「这里有照片」），再放照片点。
-  // 同一处的照片在地图上会完全重合，叠成一坨看起来就像「两张一样的图」，
-  // 所以同一格只保留一个标记，其余照片在侧栏/抽屉里照样能点开。
-  const DOT_MIN_GAP = 40;
-  const taken: L.Point[] = [];
-  if (map) {
-    for (const place of props.places) {
-      const [pLat, pLng] = toMapCoords(place.lat, place.lng, provider.value.crs);
-      taken.push(map.latLngToContainerPoint([pLat, pLng]));
-    }
-  }
-  const collides = (point: L.Point): boolean =>
-    taken.some((other) => Math.abs(other.x - point.x) < DOT_MIN_GAP && Math.abs(other.y - point.y) < DOT_MIN_GAP);
-
-  let rendered = 0;
-  for (const photo of props.photos) {
-    if (photo.lat === null || photo.lng === null) continue;
-    if (covers.has(photo.id)) continue;
-    if (rendered >= MAX_PHOTO_DOTS) break;
-    const [lat, lng] = toMapCoords(photo.lat, photo.lng, provider.value.crs);
-    if (map) {
-      const point = map.latLngToContainerPoint([lat, lng]);
-      if (collides(point)) continue;
-      taken.push(point);
-    }
-    rendered += 1;
-    const marker = L.marker([lat, lng], {
-      icon: photoIcon(photo, photo.id === props.selectedPlaceId),
-      keyboard: false,
-    });
-    marker.on('click', (event) => {
-      L.DomEvent.stopPropagation(event);
-      emit('photo-click', photo);
-    });
-    marker.addTo(photoLayer);
-  }
-}
 
 onMounted(() => {
   if (!container.value) return;
@@ -526,18 +453,17 @@ onMounted(() => {
     zoom: 4,
     worldCopyJump: true,
   });
-  // 顺序即层级：旅行框在最下面，其次是地点气泡，最后是单张照片点
+  // 顺序即层级：旅行框在最下面，地点气泡在上
   tripLayer = L.layerGroup().addTo(map);
   placeLayer = L.layerGroup().addTo(map);
-  photoLayer = L.layerGroup().addTo(map);
 
   map.on('click', (event: L.LeafletMouseEvent) => {
     const [lat, lng] = fromMapCoords(event.latlng.lat, event.latlng.lng, provider.value.crs);
     emit('map-click', lat, lng);
   });
   map.on('zoomend', () => {
-    // 缩放级别只用于决定要不要显示单张照片点、以及聚合到哪一级，因此留在组件内部，
-    // 不向上层抛事件——缩放是高频事件，回写选中状态会把刚打开的面板立刻关掉
+    // 缩放级别只用于决定聚合到哪一级，因此留在组件内部，不向上层抛事件——
+    // 缩放是高频事件，回写选中状态会把刚打开的面板立刻关掉
     zoomLevel.value = map ? map.getZoom() : zoomLevel.value;
     updateCoverage();
   });
@@ -560,7 +486,6 @@ onBeforeUnmount(() => {
   tileLayer = null;
   tripLayer = null;
   placeLayer = null;
-  photoLayer = null;
 });
 
 watch(() => props.places, () => {
@@ -568,25 +493,17 @@ watch(() => props.places, () => {
   renderPlaces();
 });
 watch(() => props.trips, renderTrips);
-watch(() => props.photos, () => {
-  renderPlaces();
-  renderPhotoDots();
-});
-watch(() => props.selectedPlaceId, () => {
-  renderPlaces();
-  renderPhotoDots();
-});
+watch(() => props.photos, renderPlaces);
+watch(() => props.selectedPlaceId, renderPlaces);
 watch(provider, () => {
   renderTile();
   renderTrips();
   renderPlaces();
-  renderPhotoDots();
   updateCoverage();
 });
-watch([() => props.showPhotoDots, zoomLevel], () => {
+watch(zoomLevel, () => {
   renderTrips();
   renderPlaces();
-  renderPhotoDots();
 });
 
 watch(

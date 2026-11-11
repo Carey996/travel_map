@@ -9,9 +9,9 @@
 | 组件 | 职责 | 主要 Element Plus 组件 |
 |---|---|---|
 | `LoginView.vue` | 登录 / 注册，带表单校验 | `el-card`, `el-form`, `el-alert` |
-| `TopBar.vue` | 地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`, `el-select`, `el-checkbox`, `el-radio-group`, `el-tooltip`, `el-avatar`, `el-dropdown` |
+| `TopBar.vue` | 地名搜索、新建地点、上传、底图切换、全览、语言、账号菜单 | `el-autocomplete`, `el-select`, `el-checkbox`, `el-radio-group`, `el-tooltip`, `el-avatar`, `el-dropdown` |
 | `PlaceSidebar.vue` | 地点列表（含本地筛选）/ 时间线 / 未定位三个视图 | `el-radio-group`（分段切换）, `el-input`（筛选）, `el-scrollbar`, `el-image`, `el-skeleton`, `el-empty` |
-| `MapCanvas.vue` | Leaflet 地图：按缩放归一分组、地点大头针、旅行框、照片点、坐标纠偏 | 无（Leaflet 直接使用） |
+| `MapCanvas.vue` | Leaflet 地图：按缩放归一分组、地点大头针、旅行框、坐标纠偏 | 无（Leaflet 直接使用） |
 | `PlaceDrawer.vue` | 地点详情：改名、分类、评分、标签、Markdown、照片、笔记、合并与删除 | `el-drawer`, `el-input`, `el-select`, `el-rate`, `el-tag`, `el-date-picker`, `el-collapse`, `ElMessageBox` |
 | `PhotoLightbox.vue` | 大图查看、EXIF 信息、说明编辑、定位与删除 | `el-dialog`, `el-image`, `el-descriptions` |
 | `PhotoUploader.vue` | 上传入口，Element Plus 负责 UI，编排交给 `lib/upload.ts` | `el-upload`（自定义 `http-request`） |
@@ -61,21 +61,15 @@ App.vue                       登录态分流 + 装配 + 全窗口拖拽上传
 **Leaflet 实例不进响应式系统。** 用普通变量（`let map`）而非 `ref`——
 Leaflet 对象内部有大量自引用与 DOM 引用，被 Vue 的 Proxy 包裹会出现难查的问题。
 
-**缩放级别留在组件内部。** `zoomLevel` 只用于决定「要不要显示单张照片点」。
+**缩放级别留在组件内部。** `zoomLevel` 只用于决定聚合到哪一级。
 早期版本把它抛给父组件回写选中状态，结果点开地点面板后 `flyTo` 触发 `zoomend`，
 用闭包里过期的 `null` 把面板立刻关掉了——这类 bug 非常隐蔽。
 
 **坐标进出都要过 `lib/coords.ts`**，依据底图源的 `crs` 决定是否纠偏。
 
-**在高缩放级别渲染照片点时有上限**（400 个），避免一次插入过多 DOM 节点。
-
-**照片点不做重叠。** 两层都会画同一张照片，所以 `renderPhotoDots()` 有两条规则：
-
-1. **跳过各地点封面对应的那张照片**——封面的圆图已经画在大头针里了；
-2. **同屏 22px 内只保留一个标记**——先放大头针（它代表「这里有照片」），再放照片点；
-   两张照片坐标几乎相同时，只画一个，否则同一位置会叠成一坨，看起来像「两张一样的图」。
-
-被筛掉的照片不是丢了：侧栏、抽屉、灯箱里都能点开。
+**地图上只有「地点」一种标记。** 单张照片不再单独画点：地点大头针的圆图就是该地点的
+封面（第一张照片），再画一个照片点就会出现「同一张照片叠两层」。看单张照片走侧栏时间线、
+地点抽屉或灯箱——这也是「以地点为主」这条设计的由来。
 
 ## MapCanvas 里的两条业务规则
 

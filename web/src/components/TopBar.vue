@@ -20,7 +20,6 @@ const emit = defineEmits<{
 }>();
 
 const tileProviderId = defineModel<string>('tileProviderId', { required: true });
-const showPhotoDots = defineModel<boolean>('showPhotoDots', { required: true });
 
 const { t, locale } = useI18n();
 const auth = useAuthStore();
@@ -121,12 +120,6 @@ async function onLogout(): Promise<void> {
     <div class="tb-spacer" />
 
     <div class="tb-group tb-tools">
-      <el-tooltip :content="t('map.showPhotoDots')" placement="bottom">
-        <el-checkbox v-model="showPhotoDots" class="tb-check">
-          <el-icon><Picture /></el-icon>
-          <span class="tb-label">{{ t('map.dots') }}</span>
-        </el-checkbox>
-      </el-tooltip>
 
       <el-tooltip :content="t('map.fitAll')" placement="bottom">
         <el-button circle @click="emit('fit-all')">

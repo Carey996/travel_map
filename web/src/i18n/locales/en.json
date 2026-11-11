@@ -23,7 +23,7 @@
   "map": {
     "searchPlaceholder": "Search a city or place…", "newPlace": "New place",
     "clickToPlace": "Click the map", "placeModeHint": "Click a spot on the map to create a place",
-    "layers": "Base map", "dots": "Photo dots", "showPhotoDots": "Show individual photos when zoomed in",
+    "layers": "Base map",
     "fitAll": "Fit all", "pickPointForPhotos": "Click the map where these photos were taken",
     "emptyTitle": "No places yet", "emptyBody": "Upload photos with GPS and places appear automatically, or click the map to create one.",
     "outsideCoverage": "Outside mainland China — switched to the global basemap (Esri)"

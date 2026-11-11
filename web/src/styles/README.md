@@ -7,7 +7,7 @@
 | 文件 | 内容 |
 |---|---|
 | `base.css` | 重置、应用骨架布局、侧栏、照片网格、Markdown 渲染、标签编辑、登录页、上传浮层、响应式 |
-| `map.css` | Leaflet 容器与控件、地点大头针、单张照片点、地图上的空状态 |
+| `map.css` | Leaflet 容器与控件、地点大头针、缩放分组卡片、旅行框、地图上的空状态 |
 
 ## 设计变量集中在 `:root`
 
@@ -43,7 +43,7 @@
 
 Leaflet 有自己的类名体系（`.leaflet-*`）与定位逻辑，不参与 Element Plus 的变量系统。
 大头针是我们用 `L.divIcon` 自己生成的 HTML，样式必须覆盖 Leaflet 默认的
-`.leaflet-div-icon` 外观——所以 `.pin-wrap` 与 `.photo-dot-wrap` 上有 `!important` 重置。
+`.leaflet-div-icon` 外观——所以 `.pin-wrap` 上有 `!important` 重置。
 
 ## 大头针的两态
 

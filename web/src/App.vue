@@ -28,7 +28,6 @@ const auth = useAuthStore();
 const gallery = useGalleryStore();
 
 const tileProviderId = ref(DEFAULT_TILE_PROVIDER);
-const showPhotoDots = ref(true);
 
 /** null = 普通浏览；'place' = 点地图新建地点；'photos' = 点地图给未定位照片选位置 */
 const placing = ref<'place' | 'photos' | null>(null);
@@ -219,7 +218,6 @@ function onSetPhotoLocation(photo: Photo): void {
     <div v-else class="app-shell">
       <TopBar
         v-model:tileProviderId="tileProviderId"
-        v-model:showPhotoDots="showPhotoDots"
         :placing="placing === 'place'"
         @toggle-placing="togglePlacePlacing"
         @fit-all="fitToken += 1"
@@ -249,14 +247,12 @@ function onSetPhotoLocation(photo: Photo): void {
             :trips="gallery.trips"
             :selected-place-id="gallery.selectedPlaceId"
             :tile-provider-id="tileProviderId"
-            :show-photo-dots="showPhotoDots"
             :placing-mode="placing !== null"
             :focus="focus"
             :fit-token="fitToken"
             :focus-trip="tripFocus"
             @select-place="(id: string | null) => gallery.selectPlace(id)"
             @map-click="onMapClick"
-            @photo-click="(photo: Photo) => (gallery.selectedPhotoId = photo.id)"
             @focus-trip="onFocusTrip"
           />
 

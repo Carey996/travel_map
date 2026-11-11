@@ -93,9 +93,9 @@ web/
 
 | 组件 | 职责 | 用到的 Element Plus |
 |---|---|---|
-| `TopBar.vue` | 单行工具条：地名搜索、新建地点、上传、底图切换、照片点开关、全览、语言、账号菜单 | `el-autocomplete`（远程搜索）、`el-select`、`el-checkbox`、`el-tooltip`、`el-avatar`、`el-dropdown` |
+| `TopBar.vue` | 单行工具条：地名搜索、新建地点、上传、底图切换、全览、语言、账号菜单 | `el-autocomplete`（远程搜索）、`el-select`、`el-checkbox`、`el-tooltip`、`el-avatar`、`el-dropdown` |
 | `PlaceSidebar.vue` | 地点列表（含本地筛选）/ 时间线 / 未定位三个视图 | `el-radio-group`（分段切换）、`el-input`、`el-scrollbar`、`el-image`、`el-skeleton`、`el-empty`、`el-alert` |
-| `MapCanvas.vue` | Leaflet 地图：**按缩放归一分组**、单个地点大头针、旅行彩色框、高缩放下的照片点、坐标系纠偏 | 无（Leaflet 直接使用） |
+| `MapCanvas.vue` | Leaflet 地图：**按缩放归一分组**、地点大头针、旅行彩色框、坐标系纠偏。**地图上只有「地点」这一种标记** | 无（Leaflet 直接使用） |
 | `PlaceDrawer.vue` | 地点详情：改名、分类、评分、标签、Markdown 摘要、照片、笔记、合并与删除 | `el-drawer`、`el-input`、`el-select`、`el-rate`、`el-tag`、`el-date-picker`、`el-collapse`、`ElMessageBox` |
 | `PhotoLightbox.vue` | 大图查看、EXIF 信息、说明编辑、定位与删除，方向键切换 | `el-dialog`、`el-image`、`el-descriptions` |
 | `PhotoUploader.vue` | 上传入口；Element Plus 负责拖拽区与逐张状态，真实编排交给 `lib/upload.ts` | `el-upload`（自定义 `http-request`） |
@@ -123,7 +123,7 @@ web/
 | `i18n/index.ts` | `createI18n`（Composition 模式）、语言探测与持久化、`setLang()` |
 | `i18n/locales/zh.json` 与 `en.json` | 词条 |
 | `styles/base.css` | 全局与布局样式：`:root` 下的 `--tb-*` 设计变量 + 骨架 / 侧栏 / 网格 / Markdown，**颜色全部引用 `--el-*` 变量**，暗色主题自动生效 |
-| `styles/map.css` | Leaflet 大头针、照片点与暗色底图适配 |
+| `styles/map.css` | Leaflet 容器与控件、地点大头针、分组卡片、旅行框 |
 
 ---
 
