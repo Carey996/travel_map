@@ -4,7 +4,7 @@
 可以搜索城市或在图上点选建点，并为每个地点写 Markdown 旅行笔记。
 
 - 框架：**Vue 3**（`<script setup>` + Composition API）
-- 组件库：**Element Plus**（全量引入，跟随系统暗色主题）
+- 组件库：**Element Plus**（按需引入，跟随系统暗色主题）
 - 状态：**Pinia**
 - 国际化：**vue-i18n**（中 / 英）
 - 地图：**Leaflet**（直接使用，未套 Vue 封装）
@@ -45,7 +45,7 @@ web/
 ├── vite.config.ts         构建与开发服务器（含后端代理、依赖分块）
 ├── tsconfig.json          类型检查配置
 └── src/
-    ├── main.ts            装配：Pinia / i18n / Element Plus / 图标 / 主题
+    ├── main.ts            装配：Pinia / i18n / 图标 / 主题（Element Plus 组件按需自动引入）
     ├── App.vue            外壳：登录态分流、装配、拖拽上传
     ├── env.d.ts           Vite 与 ImportMetaEnv 类型声明
     ├── components/        视图组件（7 个 .vue）
@@ -76,7 +76,7 @@ web/
 
 | 文件 | 职责 |
 |---|---|
-| `main.ts` | 注册 Pinia、vue-i18n、Element Plus 与全部图标；把 `prefers-color-scheme` 同步到 `<html class="dark">` |
+| `main.ts` | 注册 Pinia、vue-i18n、`v-loading` 指令（`ElLoading`）与**按需注册的图标**；Element Plus 组件与样式由 `unplugin-vue-components` 自动引入，不在这里注册；把 `prefers-color-scheme` 同步到 `<html class="dark">` |
 | `App.vue` | 未登录显示 `LoginView`，已登录装配顶栏 / 侧栏 / 地图 / 抽屉 / 灯箱；处理「在地图上点选建点」这一跨组件交互；全窗口拖拽上传与批量进度浮层 |
 
 ### stores/ —— 状态
@@ -151,13 +151,24 @@ web/
 写成双大括号会被当作嵌套占位符并在运行时抛错——注意这**与 react-i18next 相反**，
 从 React 迁移过来时最容易踩。
 
-### 4. Element Plus 全量引入
+### 4. Element Plus 按需引入
 
-`main.ts` 里 `app.use(ElementPlus)` 并引入完整样式。好处是零配置、模板里直接写
-`<el-*>`、类型提示完整；代价是 element-plus 分块约 1.1 MB（gzip 354 KB）。
+模板里照常写 `<el-button>`、`<el-dialog>`，但**没有** `app.use(ElementPlus)`，也不引整包 CSS。
+`vite.config.ts` 里装了 `unplugin-vue-components`，配 `ElementPlusResolver({ importStyle: 'css' })`：
+构建时扫描模板，用到哪个组件就自动 `import` 组件本身和它自己的那份 `theme-chalk` 样式。
 
-若要瘦身，可改用按需引入（`unplugin-vue-components` 配合 `ElementPlusResolver`），
-代价是会产生自动生成的类型声明文件，首次克隆需先构建一次。
+维护规则：
+
+- **新增/删除 `<el-*>` 组件不用改任何注册代码**，也不需要手工维护组件清单
+- 不走组件解析的入口要自己引入：`v-loading` 指令在 `main.ts` 里 `app.use(ElLoading)`，
+  `ElMessage` / `ElMessageBox` 这类命令式服务在组件里显式 import，对应样式在 `main.ts` 里
+  按需引入（`element-plus/es/components/{message,message-box,loading}/style/css`）
+- 图标**不是**自动的：模板里的 `<Location />` 需要从 `@element-plus/icons-vue` 显式 import
+  并注册到 `main.ts` 的 `icons` 清单（只注册用到的，原来是 293 个全量注册）
+- `Components()` 设了 `dts: false`，不生成 `components.d.ts`（`tsconfig.json` 也没 include 它）
+- 暗色变量仍来自 `element-plus/theme-chalk/dark/css-vars.css`，与按需引入互不影响
+
+> 改回全量只有一种情况：需要大量动态组件名（`:is="'el-' + x"`）。当前模板里没有这种用法。
 
 ### 5. 暗色主题
 
@@ -215,6 +226,10 @@ Element Plus 的暗色变量挂在 `<html class="dark">` 上，`main.ts` 监听
 **加一个组件**：在 `src/components/` 新建 `.vue`，用 `<script setup lang="ts">`。
 状态从 `useGalleryStore()` 或 `useAuthStore()` 取，不要在组件里直接调 `api`（除非是一次性查询）。
 
+**用一个新的 Element Plus 组件 / 图标**：模板里直接写 `<el-*>` 即可，resolver 会自动按需
+import 组件与样式，**不用注册**；图标要从 `@element-plus/icons-vue` 显式 import 后加进
+`main.ts` 的 `icons` 清单（详见上文「Element Plus 按需引入」）。
+
 **加一条词条**：同时改 `i18n/locales/zh.json` 与 `en.json`（键名必须对齐），插值用单大括号。
 
 **加一个底图源**：往 `TILE_PROVIDERS` 追加一项，务必正确填写 `crs`——
@@ -227,16 +242,21 @@ Element Plus 的暗色变量挂在 `<html class="dark">` 上，`main.ts` 监听
 
 ## 构建产物
 
-执行 `npm run build` 后：
+执行 `npm run build` 后（Element Plus 已按需引入，以下为实测）：
 
 | 产物 | 原始 | gzip |
 |---|---|---|
-| `element-plus-*.js` | 1,131 KB | 354 KB |
-| `index-*.js` | 192 KB | 67 KB |
+| `element-plus-*.js` | 532 KB | 172 KB |
+| `index-*.js` | 208 KB | 73 KB |
 | `leaflet-*.js` | 149 KB | 43 KB |
-| `element-plus-*.css` | 363 KB | 49 KB |
+| `element-plus-*.css` | 173 KB | 24 KB |
+
+首屏 JS 的 gzip 合计从约 470 KB 降到约 288 KB（−39%），其中 element-plus 分块
+从 354 KB 降到 172 KB（−51%）；首屏 CSS 的 gzip 从约 60 KB 降到约 35 KB。
 
 大依赖已通过 `manualChunks`（`vite.config.ts`）拆分成独立分块，更新业务代码时它们仍走浏览器缓存。
+`chunkSizeWarningLimit` 收到 700 KB：按需引入后最大的分块约 532 KB，再涨上去通常意味着
+又整包 import 了 Element Plus。
 
 ---
 

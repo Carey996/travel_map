@@ -442,7 +442,8 @@ GET    /api/v1/geo/search?q=            地名搜索
 ## 已知限制
 
 - **浏览器无法解码 HEIC**（部分 iPhone 原图）——可上传、有定位，但缩略图要等后续加后端兜底
-- Element Plus 为全量引入，element-plus 分块约 354 KB（gzip）；需要瘦身可改按需引入，见 `web/README.md`
+- Element Plus 已改为**按需引入**（`unplugin-vue-components` + `ElementPlusResolver`）：
+  element-plus 分块降到约 172 KB（gzip，原全量为 354 KB），维护方式见 `web/README.md`
 - 上传是**逐张**登记的（每张需要自己的预签名 URL），超大相册会慢一些
 - 公开只读分享页尚未实现（`shares` 表已预留）；旅行目前只有「地图上的框 + 侧栏列表」，
   还没有行程详情页与顺序编排（`trip_places` 的 position / day_index 已经就位）

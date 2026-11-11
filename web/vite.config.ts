@@ -2,9 +2,25 @@ import { fileURLToPath, URL } from 'node:url';
 
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
+import Components from 'unplugin-vue-components/vite';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    /**
+     * Element Plus 按需引入（官方方案）。
+     * 模板里写 <el-button> 即自动 import 对应组件并按需带上该组件的 CSS，
+     * 新增/删除组件都不需要再维护注册清单。
+     * 指令（v-loading）与命令式服务（ElMessage/ElMessageBox）不经过 resolver，
+     * 由 src/main.ts 里显式引入并注册/引样式。
+     */
+    Components({
+      resolvers: [ElementPlusResolver({ importStyle: 'css' })],
+      // 不生成 components.d.ts：tsconfig.json 未 include 它，生成只会多出一个未跟踪文件
+      dts: false,
+    }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -26,7 +42,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    chunkSizeWarningLimit: 1500,
+    // 按需引入后最大的分块是 element-plus（约 532 KB），原来的 1500 阈值已失去告警意义；
+    // 收紧到 700 KB：以后再涨上去通常意味着按需引入被破坏（例如又整包 import 了）
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
         // 把体积大且更新频率低的依赖拆出来，利用浏览器缓存
