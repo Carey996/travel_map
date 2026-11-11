@@ -393,6 +393,14 @@ function renderPlaces(): void {
 
 /** 旅行框：同一 trip 的地点用同色虚线框圈起来，框上带旅行名 */
 
+/** 把地理包围盒换算成屏幕像素尺寸（没有地图时给 0） */
+function tripScreenSize(bounds: L.LatLngBounds): { w: number; h: number } {
+  if (!map) return { w: 0, h: 0 };
+  const nw = map.latLngToContainerPoint(bounds.getNorthWest());
+  const se = map.latLngToContainerPoint(bounds.getSouthEast());
+  return { w: Math.abs(se.x - nw.x), h: Math.abs(se.y - nw.y) };
+}
+
 function renderTrips(): void {
   if (!tripLayer) return;
   tripLayer.clearLayers();
@@ -413,25 +421,34 @@ function renderTrips(): void {
     const padLat = Math.max(0.015, (maxLat - minLat) * 0.15);
     const padLng = Math.max(0.015, (maxLng - minLng) * 0.15);
 
-    const rect = L.rectangle(
-      [
-        [minLat - padLat, minLng - padLng],
-        [maxLat + padLat, maxLng + padLng],
-      ],
-      {
-        color,
-        weight: 2,
-        opacity: 0.85,
-        fillColor: color,
-        fillOpacity: 0.08,
-        dashArray: '7 5',
-      },
-    );
-    rect.bindTooltip(
-      '<span class="trip-chip" style="background:' + color + '">' +
-        escapeHtml(trip.title || t('trip.untitled')) + '</span>',
-      { permanent: true, direction: 'top', className: 'trip-tip', opacity: 1, offset: [0, -2] },
-    );
+    const bounds = L.latLngBounds([
+      [minLat - padLat, minLng - padLng],
+      [maxLat + padLat, maxLng + padLng],
+    ]);
+
+    // 框在屏幕上的实际大小：缩得越远框越小，而标签大小是固定的，
+    // 所以在省级/国家级这种缩放下标签会把旁边的分组卡片整个盖住。
+    const size = tripScreenSize(bounds);
+    const tooSmall = size.w < 26 && size.h < 26;
+
+    const rect = L.rectangle(bounds, {
+      color,
+      weight: tooSmall ? 1.5 : 2,
+      opacity: tooSmall ? 0.6 : 0.85,
+      fillColor: color,
+      fillOpacity: tooSmall ? 0 : 0.08,
+      dashArray: '7 5',
+    });
+
+    // 只在框足够大（看得出是一块区域）时才挂常驻标签
+    if (size.w >= 40 && size.h >= 40) {
+      rect.bindTooltip(
+        '<span class="trip-chip" style="background:' + color + '">' +
+          escapeHtml(trip.title || t('trip.untitled')) + '</span>',
+        // center：框常常比视口还高，靠上对齐会让标签跑到屏幕外
+        { permanent: true, direction: 'center', className: 'trip-tip', opacity: 1 },
+      );
+    }
     rect.on('click', (event) => {
       L.DomEvent.stopPropagation(event);
       emit('focus-trip', trip.id);
@@ -529,6 +546,7 @@ watch(provider, () => {
   updateCoverage();
 });
 watch([() => props.showPhotoDots, zoomLevel], () => {
+  renderTrips();
   renderPlaces();
   renderPhotoDots();
 });
