@@ -18,7 +18,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import type { Photo, Place, Trip } from '@/api/client';
-import { fromMapCoords, outOfChina, toMapCoords } from '@/lib/coords';
+import { fromMapCoords, toMapCoords } from '@/lib/coords';
 import { findProvider } from '@/lib/tiles';
 import { tripColor } from '@/lib/trips';
 
@@ -61,15 +61,39 @@ let placeLayer: L.LayerGroup | null = null;
 let photoLayer: L.LayerGroup | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
-const provider = computed(() => findProvider(props.tileProviderId));
+/** 视图跑到中国大陆以外时自动换用的底图（高德只覆盖大陆，境外会是一片空白） */
+const FALLBACK_PROVIDER_ID = 'esri-street';
 
-/** 底图只覆盖中国大陆时（高德），视图跑到境外就浮一条说明，免得看到一片空白以为坏了 */
-const outsideCoverage = ref(false);
+/** 是否已切到境外底图 */
+const outsideChina = ref(false);
+
+const provider = computed(() =>
+  findProvider(outsideChina.value ? FALLBACK_PROVIDER_ID : props.tileProviderId),
+);
+
+/**
+ * 判断视图中心是否已经离开中国大陆，据此自动切换底图。
+ *
+ * 带滞回：出去时按原始范围判断，回来时要求更深地进入境内（内缩 1°），
+ * 否则在边界附近来回平移会让底图反复横跳。
+ */
+const CHINA_BOX = { minLng: 73.5, maxLng: 135.1, minLat: 18.1, maxLat: 53.6 };
+const CHINA_MARGIN_DEG = 1;
+
+function outsideMainland(lat: number, lng: number, currentlyOutside: boolean): boolean {
+  const inside = (margin: number): boolean =>
+    lat > CHINA_BOX.minLat + margin &&
+    lat < CHINA_BOX.maxLat - margin &&
+    lng > CHINA_BOX.minLng + margin &&
+    lng < CHINA_BOX.maxLng - margin;
+  // 已经在境外时，要求进到境内 1° 以内才切回高德；否则一离开就算境外
+  return currentlyOutside ? !inside(CHINA_MARGIN_DEG) : !inside(0);
+}
 
 function updateCoverage(): void {
   if (!map) return;
   const center = map.getCenter();
-  outsideCoverage.value = provider.value.crs === 'GCJ02' && outOfChina(center.lat, center.lng);
+  outsideChina.value = outsideMainland(center.lat, center.lng, outsideChina.value);
 }
 
 // ---------------------------------------------------------------------------
@@ -550,8 +574,8 @@ watch(
   <div class="map-shell">
     <div ref="container" class="map-canvas" :class="{ 'is-placing': props.placingMode }" />
 
-    <div v-if="outsideCoverage" class="map-notice">
-      <el-icon><Warning /></el-icon>
+    <div v-if="outsideChina" class="map-notice">
+      <el-icon><Globe /></el-icon>
       <span>{{ t('map.outsideCoverage') }}</span>
     </div>
   </div>

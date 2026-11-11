@@ -107,6 +107,13 @@
   height: 100%;
   border-radius: 50%;
   font-size: 21px;
+  /* 还没上传照片的地点：给一层主题色底的占位，避免看起来像图片加载失败 */
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-primary) 22%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-primary) 8%, var(--el-bg-color))
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
 }
 
 .pin-count {
