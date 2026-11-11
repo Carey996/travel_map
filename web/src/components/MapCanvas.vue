@@ -201,21 +201,79 @@ function placeIcon(place: Place, cover: Photo | null, selected: boolean): L.DivI
   });
 }
 
-/** 归一后的分组气泡：照片数 + 行政区名；没有名字时只显示数字 */
-function clusterIcon(cluster: Cluster): L.DivIcon {
+/**
+ * 归一后的分组标记。
+ *
+ * 有样图时画成「前三张叠放」——和相册 App 的分组卡片一个意思，
+ * 一眼能看出这一堆是什么；没有样图（地点还没照片）就退回纯色气泡。
+ */
+function clusterIcon(cluster: Cluster, samples: string[]): L.DivIcon {
   const count = cluster.photoCount || cluster.places.length;
   const label = cluster.label
     ? '<span class="cluster-label">' + escapeHtml(cluster.label) + '</span>'
     : '';
+
+  if (samples.length === 0) {
+    return L.divIcon({
+      className: 'cluster-wrap',
+      html:
+        '<div class="cluster cluster-' + cluster.level + '">' +
+        '<span class="cluster-count">' + count + '</span>' + label +
+        '</div>',
+      iconSize: [72, 40],
+      iconAnchor: [36, 20],
+    });
+  }
+
+  // 最上面那张用轮播序号最大的类名，方便 CSS 逐层错位
+  const stack = samples
+    .map((url, index) => '<img class="cluster-img stack-' + (samples.length - index) + '" src="' + url + '" alt="" loading="lazy" />')
+    .join('');
+
   return L.divIcon({
     className: 'cluster-wrap',
     html:
-      '<div class="cluster cluster-' + cluster.level + '">' +
-      '<span class="cluster-count">' + count + '</span>' + label +
+      '<div class="cluster-card cluster-' + cluster.level + '">' +
+      '<div class="cluster-stack">' + stack +
+      '<span class="cluster-count">' + count + '</span></div>' +
+      label +
       '</div>',
-    iconSize: [72, 40],
-    iconAnchor: [36, 20],
+    iconSize: [76, 86],
+    iconAnchor: [38, 43],
   });
+}
+
+/** 每个地点先取三张缩略图，聚类时拼成叠放样图 */
+function buildSampleMap(): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const photo of props.photos) {
+    if (!photo.place_id) continue;
+    const list = map.get(photo.place_id);
+    if (!list) map.set(photo.place_id, [photo.thumb_url]);
+    else if (list.length < 3) list.push(photo.thumb_url);
+  }
+  return map;
+}
+
+/**
+ * 取最多三张样图，**按地点轮转**：先给每个地点取一张，不够再取第二张。
+ * 否则一个地点有 3 张照片时，叠放的全是同一处，看不出这组里还有别的地方。
+ */
+function collectSamples(cluster: Cluster, map: Map<string, string[]>): string[] {
+  const lists = cluster.places.map((place) => map.get(place.id) ?? []).filter((list) => list.length > 0);
+  const out: string[] = [];
+  for (let round = 0; out.length < 3; round += 1) {
+    let picked = false;
+    for (const list of lists) {
+      if (round < list.length) {
+        out.push(list[round]);
+        picked = true;
+        if (out.length >= 3) break;
+      }
+    }
+    if (!picked) break;
+  }
+  return out;
 }
 
 function photoIcon(photo: Photo, selected: boolean): L.DivIcon {
@@ -279,11 +337,12 @@ function renderPlaces(): void {
     return;
   }
 
-  // 归一：一个分组一个气泡，点一下放大到这一组
+  // 归一：一个分组一个标记（前三张叠放），点一下放大到这一组
+  const sampleMap = buildSampleMap();
   for (const cluster of buildClusters(level)) {
     const [lat, lng] = toMapCoords(cluster.lat, cluster.lng, provider.value.crs);
     const marker = L.marker([lat, lng], {
-      icon: clusterIcon(cluster),
+      icon: clusterIcon(cluster, collectSamples(cluster, sampleMap)),
       keyboard: false,
       riseOnHover: true,
       // 原生 title：悬停时同时给出地点数与照片数，避免「那个数字到底数什么」的歧义
